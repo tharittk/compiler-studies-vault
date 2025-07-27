@@ -1,6 +1,6 @@
 ##===- tools/Makefile --------------------------------------*- Makefile -*-===##
 
 LEVEL = ..
-PARALLEL_DIRS =
+PARALLEL_DIRS = lexer
 
 include $(LEVEL)/Makefile.common
