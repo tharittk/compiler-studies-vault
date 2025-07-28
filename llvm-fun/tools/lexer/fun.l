@@ -10,21 +10,49 @@ int yycolumn = 1;
   yycolumn = yycolumn_next; \
   yycolumn_next += yyleng; \
   yylval.id = strndup(yytext, yyleng);
-
 %}
 
 %option yylineno
 %option nounput
 %option noyywrap
 
-/* TODO Fill in definitions here */
-
+/* Definitions */
+letter  [A-Za-z]
+digit   [0-9]
 %%
+[ \t] ;
+fun {return FUN;}
+in {return IN;}
+let {return LET;}
+while {return WHILE;}
+do {return DO;}
+if {return IF;}
+then {return THEN;}
+ELSE {return ELSE;}
+ref {return REF;}
+not {return NOT;}
+type {return TYPE;}
+"->" {return ARROW;}
 
- /* TODO Fill in rules here (In the rules section a comment can't start from the
-    beginning of a line) */
+"/*" {std::cout << "Open comment \n";} // TODO
+"*/" {std::cout << "Close comment \n";}
+\( {return '(';}
+\) {return ')';}
+\n {yycolumn=1; yycolumn_next=1;}
+"||" {return OR;}
+":=" {return ASSIGN;}
+\: {return ':';}
+# {return '#';}
+\< {return '<';}
+\> {return '>';}
+\+ {return '+';}
+, {return ',';}
+= {return '=';}
+& {return '&';}
+\* {return '*';}
 
-
+{letter}+({letter}|{digit})*  {yylval.id = strdup(yytext); return ID;}
+"-"?{digit}+ {yylval.num = atoi(yytext); return NUM;}
 %%
 
 void yyerror(const char *s) {

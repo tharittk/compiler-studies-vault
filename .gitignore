@@ -1,1 +1,7 @@
+.DS_Store
 future/
+llvm-fun-install/
+llvm-fun/config.log
+llvm-fun/config.status
+llvm-fun/Makefile.common
+llvm-fun/Makefile.llvm.config
