@@ -5,6 +5,7 @@
 void yyerror(const char *s);
 int yycolumn_next = 1;
 int yycolumn = 1;
+int comments_depth = 0;
 
 #define YY_USER_ACTION \
   yycolumn = yycolumn_next; \
@@ -16,6 +17,7 @@ int yycolumn = 1;
 %option nounput
 %option noyywrap
 
+%x COMMENTS
 /* Definitions */
 letter  [A-Za-z]
 digit   [0-9]
@@ -28,14 +30,11 @@ while {return WHILE;}
 do {return DO;}
 if {return IF;}
 then {return THEN;}
-ELSE {return ELSE;}
+else {return ELSE;}
 ref {return REF;}
 not {return NOT;}
 type {return TYPE;}
 "->" {return ARROW;}
-
-"/*" {std::cout << "Open comment \n";} // TODO
-"*/" {std::cout << "Close comment \n";}
 \( {return '(';}
 \) {return ')';}
 \n {yycolumn=1; yycolumn_next=1;}
@@ -50,9 +49,26 @@ type {return TYPE;}
 = {return '=';}
 & {return '&';}
 \* {return '*';}
+! {return '!';}
+- {return '-';}
+";" {return ';';}
 
-{letter}+({letter}|{digit})*  {yylval.id = strdup(yytext); return ID;}
-"-"?{digit}+ {yylval.num = atoi(yytext); return NUM;}
+{letter}+(_|{letter}|{digit})*  {yylval.id = strdup(yytext); return ID;}
+{digit}+ {yylval.num = atoi(yytext); return NUM;}
+
+"/*" {BEGIN(COMMENTS); ++comments_depth;}
+<COMMENTS>"*/" {
+  --comments_depth;
+  if (comments_depth == 0){
+    BEGIN(INITIAL);
+  }}
+<COMMENTS>"/*" {++comments_depth;}
+<COMMENTS>\n {yycolumn=1; yycolumn_next=1;}
+<COMMENTS>. ;
+. {
+  fprintf(stderr, "Illegal character: '%s' at line %d, column %d\n", yytext, yylineno, yycolumn);
+  exit(1);
+}
 %%
 
 void yyerror(const char *s) {
