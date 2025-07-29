@@ -1,6 +1,6 @@
 ##===- lib/Makefile ----------------------------------------*- Makefile -*-===##
 
 LEVEL = ..
-PARALLEL_DIRS =
+PARALLEL_DIRS = AST Visitor
 
 include $(LEVEL)/Makefile.common

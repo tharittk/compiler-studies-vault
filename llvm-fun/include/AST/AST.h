@@ -1,0 +1,32 @@
+#ifndef FUN_AST_AST_H
+#define FUN_AST_AST_H
+
+#include "BaseAST.h"
+#include "BinExpAST.h"
+#include "CallExpAST.h"
+#include "ConstrainExpAST.h"
+#include "ExpAST.h"
+#include "ExpASTList.h"
+#include "FunDeclAST.h"
+#include "FunTypeAST.h"
+#include "IdExpAST.h"
+#include "IfExpAST.h"
+#include "IntExpAST.h"
+#include "IntTypeAST.h"
+#include "LetExpAST.h"
+#include "MyType.h"
+#include "MyValue.h"
+#include "OpInfo.h"
+#include "ProgramAST.h"
+#include "ProjExpAST.h"
+#include "RefTypeAST.h"
+#include "SeqExpAST.h"
+#include "SrcLoc.h"
+#include "TupleExpAST.h"
+#include "TupleTypeAST.h"
+#include "TypeAST.h"
+#include "TypeASTList.h"
+#include "UnExpAST.h"
+#include "WhileExpAST.h"
+
+#endif

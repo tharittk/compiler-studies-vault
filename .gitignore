@@ -3,5 +3,6 @@ future/
 llvm-fun-install/
 llvm-fun/config.log
 llvm-fun/config.status
+llvm-fun/configure.out
 llvm-fun/Makefile.common
 llvm-fun/Makefile.llvm.config
