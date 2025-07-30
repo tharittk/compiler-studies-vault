@@ -52,7 +52,7 @@ type {return TYPE;}
 & {return '&';}
 \* {return '*';}
 ! {return '!';}
-- {return MINUS;}
+- {return '-';}
 ";" {return ';';}
 
 {letter}+(_|{letter}|{digit})*  {yylval.id = strdup(yytext); return ID;}

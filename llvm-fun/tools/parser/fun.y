@@ -20,7 +20,7 @@ ProgramAST *program = NULL;
 }
 %token <num> NUM
 %token <id> ID
-%token OR ASSIGN FUN IN LET WHILE DO IF THEN ELSE REF ARROW MINUS NOT TYPE
+%token OR ASSIGN FUN IN LET WHILE DO IF THEN ELSE REF ARROW NOT TYPE
 
 %start program
 
@@ -32,30 +32,15 @@ ProgramAST *program = NULL;
 %nonassoc ':'
 %left '&' OR
 %nonassoc NOT
-%left '=' '<' '>'
-%left '+' MINUS // binary minus
+%left '=' '<'
+%left '+' '-'
 %left '*'
 %nonassoc '#'
 %right ARROW
 %left REF '!' UNARY_OP
+%left FCALL
+
 %%
-
-unary_op: MINUS {/* do something */}
-  | NOT
-  | '!'
-  | '#' NUM
-  ;
-
-binary_op: '+'
-  | MINUS
-  | '*'
-  | '&'
-  | OR
-  | '='
-  | '<'
-  | '>' // not in webpage doc
-  | ASSIGN
-  ;
 
 tp: ID
   | '<' tp_list '>'
@@ -70,33 +55,48 @@ tp_list: /* empty */
   ;
 
 exp: '(' exp ')'
-  | ID
-  | NUM
+  | ID '(' exp ')' %prec FCALL
+  // Unary operator
+  | '-' exp %prec UNARY_OP
+  | NOT exp %prec UNARY_OP
+  | '!' exp %prec UNARY_OP
+  | '#' NUM exp %prec UNARY_OP
+  // Binary operator
+  | exp '+' exp
+  | exp '-' exp
+  | exp '*' exp
+  | exp '&' exp
+  | exp OR exp
+  | exp '=' exp
+  | exp '<' exp
+  | exp ASSIGN exp
   | exp ';' exp
-  | unary_op exp %prec UNARY_OP
-  | exp binary_op exp
-  | '<' exp_list '>'
-  | exp '(' exp ')'
+  | '<' '>'
+  | '<' non_empty_exp_list '>'
   | exp ':' tp
   | if_stmt
   | WHILE exp DO exp
   | LET ID '=' exp IN exp
   | REF exp
+  | ID
+  | NUM
   ;
+
 
 if_stmt: IF exp THEN exp %prec IFX
   | IF exp THEN exp ELSE exp
 
-exp_list: /* empty */
-  | exp ',' exp_list // allow trailing comma
+
+non_empty_exp_list:
+   exp
+  | exp ','
+  | exp ',' non_empty_exp_list 
   ;
 
 
 fun: FUN ID '(' ID ':' tp ')' ':' tp '=' exp;
 
-fun_seq: /* empty */
-  | fun fun_seq
-
-program: fun_seq 
+program: /* empty */
+  | fun program
 
 %%
