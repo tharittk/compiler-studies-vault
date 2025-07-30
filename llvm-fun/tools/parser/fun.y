@@ -17,32 +17,36 @@ ProgramAST *program = NULL;
 %union {
   int num;
   char *id;
-  char *unary_op;
-  char *binary_op;
-  int expr;
-  /* TODO Add more AST classes here */
 }
 %token <num> NUM
 %token <id> ID
-%token OR ASSIGN FUN IN LET WHILE DO IF THEN ELSE REF TYPE ARROW
+%token OR ASSIGN FUN IN LET WHILE DO IF THEN ELSE REF ARROW MINUS NOT TYPE
 
-%token <unary_op> MINUS NOT 
-%type <expr> exp
-%type <unary_op> UNARY_OP
-%type <binary_op> BINARY_OP
 %start program
 
-
-/* TODO Fill in declarations here: union, token, type, operator associativities, ... */
-
+%nonassoc IFX
+%nonassoc LET IN
+%nonassoc ';'
+%nonassoc IF THEN ELSE DO WHILE
+%left ASSIGN
+%nonassoc ':'
+%left '&' OR
+%nonassoc NOT
+%left '=' '<' '>'
+%left '+' MINUS // binary minus
+%left '*'
+%nonassoc '#'
+%right ARROW
+%left REF '!' UNARY_OP
 %%
 
-UNARY_OP: MINUS {/* do something */}
+unary_op: MINUS {/* do something */}
   | NOT
   | '!'
   | '#' NUM
+  ;
 
-BINARY_OP: '+'
+binary_op: '+'
   | MINUS
   | '*'
   | '&'
@@ -51,35 +55,48 @@ BINARY_OP: '+'
   | '<'
   | '>' // not in webpage doc
   | ASSIGN
+  ;
 
-tp: "int"
-  | '<' tp '>' // TODO: n-array
+tp: ID
+  | '<' tp_list '>'
   | tp ARROW tp
   | tp REF
   | '(' tp ')'
+  ;
 
+tp_list: /* empty */
+  | tp
+  | tp ',' tp_list
+  ;
 
 exp: '(' exp ')'
   | ID
   | NUM
   | exp ';' exp
-  | UNARY_OP exp
-  | exp BINARY_OP exp
-  | '<' exp '>' // n-array
+  | unary_op exp %prec UNARY_OP
+  | exp binary_op exp
+  | '<' exp_list '>'
   | exp '(' exp ')'
   | exp ':' tp
-  | IF exp THEN exp ELSE exp
-  | IF exp THEN exp
+  | if_stmt
   | WHILE exp DO exp
   | LET ID '=' exp IN exp
   | REF exp
+  ;
 
-fun: FUN ID '(' ID ':' tp ')' ':' tp '=' exp
+if_stmt: IF exp THEN exp %prec IFX
+  | IF exp THEN exp ELSE exp
 
-main: FUN "main" '(' ID ':' tp ')' ':' tp '=' exp // TODO: both must be int
+exp_list: /* empty */
+  | exp ',' exp_list // allow trailing comma
+  ;
 
-/* Fill in grammar rules and semantic actions here */
 
-program:
+fun: FUN ID '(' ID ':' tp ')' ':' tp '=' exp;
+
+fun_seq: /* empty */
+  | fun fun_seq
+
+program: fun_seq 
 
 %%
