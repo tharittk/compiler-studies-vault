@@ -1,5 +1,6 @@
 %{
 #include "AST/AST.h"
+#include <iostream>
 
 using namespace fun;
 
@@ -38,6 +39,7 @@ ProgramAST *program = NULL;
 %nonassoc '#'
 %right ARROW
 %left REF '!' UNARY_OP
+%nonassoc ')'
 %left FCALL
 
 %%
@@ -54,8 +56,9 @@ tp_list: /* empty */
   | tp ',' tp_list
   ;
 
-exp: '(' exp ')'
-  | ID '(' exp ')' %prec FCALL
+exp: primary_exp
+  | exp '(' exp ')' %prec FCALL
+  /* | exp '(' exp ')' prec FCALL */
   // Unary operator
   | '-' exp %prec UNARY_OP
   | NOT exp %prec UNARY_OP
@@ -78,10 +81,15 @@ exp: '(' exp ')'
   | WHILE exp DO exp
   | LET ID '=' exp IN exp
   | REF exp
+  ;
+  /* | ID
+  | NUM */
+
+primary_exp:
+  '(' exp ')'
   | ID
   | NUM
   ;
-
 
 if_stmt: IF exp THEN exp %prec IFX
   | IF exp THEN exp ELSE exp
