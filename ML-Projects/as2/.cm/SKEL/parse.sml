@@ -1,2 +1,0 @@
-Skeleton 5
-d2f4ä¢LrParser"d"ErrorMsg"d"Absyn"d"TextIO"ad"Parse"jh3aä¢FunLrVals"jh1aä¢Token"gp2ÿÿgp1e"FunLrValsFun"aä¢FunLex"jh1aä¢Tokens"gp2ÿ8ÿ8gp1e"FunLexFun"ad"FunParser"jh3aä¢ParserData"gp2ÿ8ÿ‚)ad"Lex"gp1ÿ+aÿgp1ÿgp1e"Join"h0
