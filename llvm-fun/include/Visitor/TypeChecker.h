@@ -1,8 +1,8 @@
 #ifndef FUN_VISITOR_TYPECHECKER_H
 #define FUN_VISITOR_TYPECHECKER_H
 
-#include "TypeVisitor.h"
 #include "AST/SrcLoc.h"
+#include "TypeVisitor.h"
 #include "Util/Context.h"
 
 namespace fun {
@@ -12,8 +12,8 @@ class MyType;
 class TypeChecker : public TypeVisitor {
 public:
   TypeChecker(ProgramAST *prg, std::string srcFileName,
-              bool abortOnError=false)
-    : prg(prg), srcFileName(srcFileName), abortOnError(abortOnError) {}
+              bool abortOnError = false)
+      : prg(prg), srcFileName(srcFileName), abortOnError(abortOnError) {}
 
   virtual MyType *visit(BinExpAST *n);
   virtual MyType *visit(CallExpAST *n);
@@ -52,7 +52,6 @@ private:
 
   // TODO You may add new functions or members here if you need to.
 
-
   // Report error with source file location
   void reportError(SrcLoc srcLoc, std::string msg) {
     std::cerr << srcFileName << ":" << srcLoc.line << ":" << srcLoc.col
@@ -65,10 +64,10 @@ private:
   ProgramAST *prg;
   std::string srcFileName;
   bool abortOnError;
-  Context<std::string, MyType*> ctxt;
+  Context<std::string, MyType *> ctxt;
   int numError;
 };
 
-}
+} // namespace fun
 
 #endif

@@ -1,5 +1,7 @@
 .DS_Store
 future/
+*.vscode*
+*Debug+Asserts*
 llvm-fun-install/
 llvm-fun/config.log
 llvm-fun/config.status

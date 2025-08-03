@@ -1,9 +1,9 @@
 #ifndef FUN_AST_MYTYPE_H
 #define FUN_AST_MYTYPE_H
 
-#include <vector>
-#include <string>
 #include <sstream>
+#include <string>
+#include <vector>
 
 namespace fun {
 
@@ -24,7 +24,7 @@ public:
   static MyIntType *getIntType();
   static MyRefType *getRefType(MyType *baseType);
   static MyFunType *getFunType(MyType *paramType, MyType *retType);
-  static MyTupleType *getTupleType(const std::vector<MyType*> &types);
+  static MyTupleType *getTupleType(const std::vector<MyType *> &types);
   static MyTupleType *getUnitType(); // empty tuple
 
   // Downcasts the given MyType class pointer into one of its child class
@@ -52,12 +52,7 @@ public:
   virtual bool isTupleType() const { return false; }
 
   // Discriminator for LLVM-style RTTI (dyn_cast<> et al.)
-  enum TypeKind {
-    TK_Int,
-    TK_Ref,
-    TK_Fun,
-    TK_Tuple
-  };
+  enum TypeKind { TK_Int, TK_Ref, TK_Fun, TK_Tuple };
   TypeKind getKind() const { return kind; }
 
 protected:
@@ -92,9 +87,11 @@ public:
 
   virtual std::string toString() const {
     std::stringstream ss;
-    if (baseType->isFunType()) ss << "(";
+    if (baseType->isFunType())
+      ss << "(";
     ss << baseType->toString();
-    if (baseType->isFunType()) ss << ")";
+    if (baseType->isFunType())
+      ss << ")";
     ss << " ref";
     return ss.str();
   }
@@ -118,9 +115,11 @@ public:
   virtual std::string toString() const {
     std::stringstream ss;
     // We should put parentheses in the case of (x->y)->z
-    if (paramType->isFunType()) ss << "(";
+    if (paramType->isFunType())
+      ss << "(";
     ss << paramType->toString();
-    if (paramType->isFunType()) ss << ")";
+    if (paramType->isFunType())
+      ss << ")";
     ss << "->";
     ss << retType->toString();
     return ss.str();
@@ -131,7 +130,7 @@ public:
 
 private:
   MyFunType(MyType *paramType, MyType *retType)
-    : MyType(TK_Fun), paramType(paramType), retType(retType) {}
+      : MyType(TK_Fun), paramType(paramType), retType(retType) {}
   MyType *paramType;
   MyType *retType;
 };
@@ -142,7 +141,7 @@ class MyTupleType : public MyType {
 public:
   int getLength() const { return types.size(); }
   MyType *getType(int idx) { return types[idx]; }
-  const std::vector<MyType*> &getTypes() const { return types; }
+  const std::vector<MyType *> &getTypes() const { return types; }
   virtual bool isTupleType() const { return true; }
 
   virtual std::string toString() const;
@@ -151,9 +150,9 @@ public:
   static bool classof(const MyType *t) { return t->getKind() == TK_Tuple; }
 
 private:
-  explicit MyTupleType(const std::vector<MyType*> &types)
-    : MyType(TK_Tuple), types(types) {}
-  std::vector<MyType*> types;
+  explicit MyTupleType(const std::vector<MyType *> &types)
+      : MyType(TK_Tuple), types(types) {}
+  std::vector<MyType *> types;
 };
 
 class MyTypeFactory {
@@ -172,17 +171,17 @@ private:
   MyIntType *getIntType() { return &intType; }
   MyRefType *getRefType(MyType *baseType);
   MyFunType *getFunType(MyType *paramType, MyType *retType);
-  MyTupleType *getTupleType(const std::vector<MyType*> &types);
-  MyTupleType *getUnitType() { return getTupleType(std::vector<MyType*>()); }
+  MyTupleType *getTupleType(const std::vector<MyType *> &types);
+  MyTupleType *getUnitType() { return getTupleType(std::vector<MyType *>()); }
 
 private:
   static MyTypeFactory *factoryInstance;
   MyIntType intType;
-  std::vector<MyRefType*> refTypes;
-  std::vector<MyFunType*> funTypes;
-  std::vector<MyTupleType*> tupleTypes;
+  std::vector<MyRefType *> refTypes;
+  std::vector<MyFunType *> funTypes;
+  std::vector<MyTupleType *> tupleTypes;
 };
 
-}
+} // namespace fun
 
 #endif
