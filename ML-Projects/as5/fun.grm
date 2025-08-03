@@ -1,0 +1,17 @@
+structure A = Absyn
+
+%%
+
+%pos ErrorMsg.pos
+%verbose
+%eop EOF
+%noshift EOF
+%name Fun
+
+%%
+
+exp: 
+    exp LPAREN exp RPAREN       (A.Pos((exp1left,RPARENright), 
+	                             A.Call (exp1,exp2)))
+
+
