@@ -5,20 +5,24 @@
 
 using namespace fun;
 
-// TODO Implement bodies of functions below. You can also add new functions.
-
 bool TypeChecker::sub(MyType *t1, MyType *t2) { return false; }
 
-MyType *TypeChecker::join(MyType *t1, MyType *t2) { return NULL; }
-
-
-MyType *TypeChecker::visit(CallExpAST *n) { return NULL; }
-
+MyType *TypeChecker::join(MyType *t1, MyType *t2) {
+  // TODO (tharitt): make it mutually recursive to find Least-common supertype
+  if (MyType::equals(t1, t2)){
+    return t1;
+  } else {
+    std::cerr << "Join error (TO IMPLEMENTED): t1 != t2";
+    return t1;
+  }
+}
 
 // Rule 1:
 MyType *TypeChecker::visit(IdExpAST *n) {
   if (!ctxt.has(n->getName())) {
-    reportError(n->getSrcLoc(), "IdExp: Id name is not bounded");
+    std::cerr << "IdExp: Id name is not bounded: " << n->getName();
+    reportError(n->getSrcLoc(), "IdExp AST error");
+    return MyType::getIntType();
   }
   // simply look up in the type table
   return ctxt.get(n->getName());
@@ -38,7 +42,6 @@ MyType *TypeChecker::visit(SeqExpAST *n) {
 // Rule 4:
 MyType *TypeChecker::visit(UnExpAST *n) {
   auto expTy = n->getExp1AST()->accept(*this);
-
   switch (n->getOp()){
     case OpKind::OP_UMinus:{
       if (!MyType::equals(expTy, MyType::getIntType())){
@@ -65,7 +68,6 @@ MyType *TypeChecker::visit(UnExpAST *n) {
       }
       return MyType::toRefType(expTy)->getBaseType();
     }
-
     default:
       reportError(n->getSrcLoc(), "Unary Op error: case does not match");
       return NULL;
@@ -76,10 +78,8 @@ MyType *TypeChecker::visit(UnExpAST *n) {
 MyType *TypeChecker::visit(BinExpAST *n) {
   auto leftExp = n->getExp1AST();
   auto rightExp = n->getExp2AST();
-
   auto leftTy = leftExp->accept(*this);
   auto rightTy = rightExp->accept(*this);
-
   switch (n->getOp()) {
   case OpKind::OP_Equal: {
     // may be id = id (var), simply check to type equivalent
@@ -123,7 +123,26 @@ MyType *TypeChecker::visit(TupleExpAST *n) {
   }
   return MyType::getTupleType(tupleTy);
 }
-MyType *TypeChecker::visit(IfExpAST *n) { return NULL; }
+
+MyType *TypeChecker::visit(IfExpAST *n) {
+  auto condTy = n->getCondExpAST()->accept(*this);
+  if (!MyType::equals(condTy, MyType::getIntType())){
+    reportError(n->getSrcLoc(), "If Error: condTy should be Int");
+  }
+
+  auto thenTy = n->getThenExpAST()->accept(*this);
+  // Rule 10:
+  if (n->getElseExpAST() == nullptr){
+    if (!MyType::equals(thenTy, MyType::getUnitType())){
+      reportError(n->getSrcLoc(), "If Error, no else, then should have Unit Ty");
+    }
+    return MyType::getUnitType();
+  }
+
+  // Rule 9: TODO (tharitt): need to do join (least super type)
+  auto elseTy = n->getElseExpAST()->accept(*this);
+  return join(thenTy, elseTy);
+}
 
 // Rule 7:
 MyType *TypeChecker::visit(ProjExpAST *n) {
@@ -138,23 +157,34 @@ MyType *TypeChecker::visit(ProjExpAST *n) {
   return NULL;
 }
 
+// Rule 8;
+MyType *TypeChecker::visit(CallExpAST *n) {
+  auto funTy = n->getFunExpAST()->accept(*this);
+  auto argTy = n->getArgExpAST()->accept(*this);
+  if (!funTy->isFunType()){
+    reportError(n->getSrcLoc(), "CallExp Error: exp is not a function type");
+  }
+  // check that supplied arg type = declared arg type
+  auto declTy = MyType::toFunType(funTy)->getParamType();
+
+  if (!MyType::equals(argTy, declTy)){
+    reportError(n->getSrcLoc(), "CallExp error: argTy and declTy mistmatches");
+  }
+  return MyType::toFunType(funTy)->getRetType();
+}
 
 // Rule 11:
 MyType *TypeChecker::visit(WhileExpAST *n) {
   auto condExp = n->getCondExpAST();
   auto bodyExp = n->getBodyExpAST();
-
   auto condTy = condExp->accept(*this);
   auto bodyTy = bodyExp->accept(*this);
-
   if (!MyType::equals(condTy, MyType::getIntType())) {
     reportError(n->getSrcLoc(), "WhileExp Error: Cond type must be int");
   }
-
   if (!MyType::equals(bodyTy, MyType::getUnitType())) {
     reportError(n->getSrcLoc(), "WhileExp Error: body type must be unit");
   }
-
   return MyType::getUnitType();
 }
 
@@ -181,19 +211,17 @@ MyType *TypeChecker::visit(ConstrainExpAST *n) {
 // Rule Function Declaration
 MyType *TypeChecker::visit(FunDeclAST *n) {
   auto retTy = MyType::getType(n->getRetTypeAST());
-  ctxt.bind(n->getName(), retTy);
-  auto ck = ctxt.checkPoint();
-  // below this only exist inside the function call
   auto paramTy = MyType::getType(n->getParamTypeAST());
-  ctxt.bind(n->getParamName(), paramTy);
+  auto funTy = MyType::getFunType(paramTy, retTy);
+  ctxt.bind(n->getName(), funTy);
 
+  ctxt.bind(n->getParamName(), paramTy); // for body checking
   auto body_ty = n->getBodyExpAST()->accept(*this);
-  if (!MyType::equals(body_ty, MyType::getType(n->getRetTypeAST()))) {
+  if (!MyType::equals(body_ty, retTy)) {
     reportError(n->getSrcLoc(), "FunDecl: body vs. ret mistmatch");
   }
-  // undo parameter binding
-  ctxt.restoreCheckPoint(ck);
-  return MyType::getFunType(paramTy, retTy);
+  ctxt.undoOne(); // clean up the param
+  return funTy;
 }
 
 
@@ -202,7 +230,7 @@ MyType *TypeChecker::visit(ProgramAST *n) {
   // Traverse each function declartion in a DFS manner
   const std::map<std::string, FunDeclAST *> &funDecls = n->getFunDeclASTs();
   for (auto it = funDecls.begin(); it != funDecls.end(); ++it) {
-    // std::cout << "DFS funcdel name: " << it->second->getName() << "\n";
+    std::cout << "DFS funcdel name: " << it->second->getName() << "\n";
     it->second->accept(*this);
   }
   return NULL;

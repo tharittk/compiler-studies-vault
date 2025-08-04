@@ -2,6 +2,7 @@
 #define FUN_VISITOR_TYPECHECKER_H
 
 #include "AST/SrcLoc.h"
+#include "AST/MyType.h"
 #include "TypeVisitor.h"
 #include "Util/Context.h"
 
@@ -38,6 +39,8 @@ public:
   int run() {
     numError = 0;
     ctxt.clear();
+    // add printint
+    ctxt.bind(std::string("printint"), MyType::getFunType(MyType::getIntType(), MyType::getUnitType()));
     visit(prg);
     return numError;
   }
