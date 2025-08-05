@@ -5,7 +5,11 @@
 
 using namespace fun;
 
-bool TypeChecker::sub(MyType *t1, MyType *t2) { return false; }
+bool TypeChecker::sub(MyType *t1, MyType *t2) {
+    // TODO: go through the inheritance hierarchy of t1 (until reach Class),
+    // return true if along the way found t2, o.w. curr = curr.parent
+    return true;
+}
 
 MyType *TypeChecker::join(MyType *t1, MyType *t2) {
   // TODO (tharitt): make it mutually recursive to find Least-common supertype
@@ -13,6 +17,9 @@ MyType *TypeChecker::join(MyType *t1, MyType *t2) {
     return t1;
   } else {
     std::cerr << "Join error (TO IMPLEMENTED): t1 != t2";
+    // TODO: go through the inheritance hierarchy of both, store
+    // each encounter in the set, and check against one anoter set.
+    // stop at first encounter
     return t1;
   }
 }
@@ -161,7 +168,7 @@ MyType *TypeChecker::visit(CallExpAST *n) {
   }
   // check that supplied arg type = declared arg type
   auto declTy = MyType::toFunType(funTy)->getParamType();
-  if (!MyType::equals(argTy, declTy)){
+  if (!sub(argTy, declTy)){
     reportError(n->getSrcLoc(), "CallExp Error: argTy and declTy mistmatches");
     return MyType::getIntType();
   }

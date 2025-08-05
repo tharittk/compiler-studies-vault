@@ -1,4 +1,4 @@
-fun addsome (x:int):int = x_ +5
+fun addsome (x:int):int = x +5
 fun add (x:<int,int>):int = #0 x + #1 x
 fun gt (t:<int,int>):int =
     let a = #0 t in
