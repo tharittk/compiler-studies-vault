@@ -20,11 +20,11 @@ MyType *TypeChecker::join(MyType *t1, MyType *t2) {
 // Rule 1:
 MyType *TypeChecker::visit(IdExpAST *n) {
   if (!ctxt.has(n->getName())) {
-    std::cerr << "IdExp: Id name is not bounded: " << n->getName();
-    reportError(n->getSrcLoc(), "IdExp AST error");
+    // std::cerr << "IdExp: Id name is not bounded: " << n->getName();
+    auto msg = "IdExp Error: "+ n->getName() + " is not in env";
+    reportError(n->getSrcLoc(), msg);
     return MyType::getIntType();
   }
-  // simply look up in the type table
   return ctxt.get(n->getName());
 }
 
@@ -33,7 +33,7 @@ MyType *TypeChecker::visit(IntExpAST *) { return MyType::getIntType(); }
 
 // Rule 3:
 MyType *TypeChecker::visit(SeqExpAST *n) {
-  // exp1 does not cause side-effect to the environment ?
+  // exp1 may change environment (ctxt)
   n->getExp1AST()->accept(*this);
   auto exp2Ty = n->getExp2AST()->accept(*this);
   return exp2Ty;
@@ -45,14 +45,15 @@ MyType *TypeChecker::visit(UnExpAST *n) {
   switch (n->getOp()){
     case OpKind::OP_UMinus:{
       if (!MyType::equals(expTy, MyType::getIntType())){
-        reportError(n->getSrcLoc(), "Unary Op error: UMinus must be applied to Int");
+        reportError(n->getSrcLoc(), "UnExp Error: UMinus must be applied to Int");
+        return MyType::getIntType();
       }
       return expTy;
     }
     case OpKind::OP_Not: {
-      // TODO: Not only applies to Int ?
       if (!MyType::equals(expTy, MyType::getIntType())){
-        reportError(n->getSrcLoc(), "Unary Op error: UMinus must be applied to Int");
+        reportError(n->getSrcLoc(), "UnExp Error: NOT must be applied to Int");
+        return MyType::getIntType();
       }
       return expTy;
     }
@@ -64,13 +65,14 @@ MyType *TypeChecker::visit(UnExpAST *n) {
     // Rule 14:
     case OpKind::OP_Get: {
       if (!expTy->isRefType()){
-        reportError(n->getSrcLoc(), "OP_Get Error, argument must be tp ref");
+        reportError(n->getSrcLoc(), "UnExp Error: GET must be applied to RefType");
+        return MyType::getIntType();
       }
       return MyType::toRefType(expTy)->getBaseType();
     }
     default:
-      reportError(n->getSrcLoc(), "Unary Op error: case does not match");
-      return NULL;
+      reportError(n->getSrcLoc(), "UnExp Error: case does not match");
+      return MyType::getIntType();
   }
 }
 
@@ -81,28 +83,19 @@ MyType *TypeChecker::visit(BinExpAST *n) {
   auto leftTy = leftExp->accept(*this);
   auto rightTy = rightExp->accept(*this);
   switch (n->getOp()) {
-  case OpKind::OP_Equal: {
-    // may be id = id (var), simply check to type equivalent
-    if (!MyType::equals(leftTy, rightTy)) {
-      reportError(n->getSrcLoc(),
-                  "BinExp: left and right must be equal type in OP_Equal");
-    }
-    return MyType::getUnitType();
-  }
   case OpKind::OP_Set: {
     // Rule 15:
     auto leftTyRef = MyType::toRefType(leftTy);
     if (leftTyRef == nullptr){
-      reportError(n->getSrcLoc(), "OP_SET :=,leftTy must be tp ref");
+      reportError(n->getSrcLoc(), "BinExp Error: LeftTy is null");
     }
     if (!MyType::equals(leftTyRef->getBaseType(), rightTy)) {
       reportError(n->getSrcLoc(),
-                  "BinExp: left and right must be equal type in OP_Set");
+                  "BinExp Error: SET BaseType of Left must be the same as Right Type");
     }
     return MyType::getUnitType();
   }
   default: {
-    // both argument must be int
     if (!MyType::equals(leftTy, MyType::getIntType())) {
       reportError(n->getSrcLoc(), "BinExp: left must be Int Type");
     }
@@ -127,18 +120,17 @@ MyType *TypeChecker::visit(TupleExpAST *n) {
 MyType *TypeChecker::visit(IfExpAST *n) {
   auto condTy = n->getCondExpAST()->accept(*this);
   if (!MyType::equals(condTy, MyType::getIntType())){
-    reportError(n->getSrcLoc(), "If Error: condTy should be Int");
+    reportError(n->getSrcLoc(), "IfExp Error: condTy should be Int");
+    return MyType::getIntType();
   }
-
   auto thenTy = n->getThenExpAST()->accept(*this);
   // Rule 10:
   if (n->getElseExpAST() == nullptr){
     if (!MyType::equals(thenTy, MyType::getUnitType())){
-      reportError(n->getSrcLoc(), "If Error, no else, then should have Unit Ty");
+      reportError(n->getSrcLoc(), "IfExp Error: THEN should have UnitTy (case: no ELSE)");
     }
     return MyType::getUnitType();
   }
-
   // Rule 9: TODO (tharitt): need to do join (least super type)
   auto elseTy = n->getElseExpAST()->accept(*this);
   return join(thenTy, elseTy);
@@ -149,12 +141,14 @@ MyType *TypeChecker::visit(ProjExpAST *n) {
   auto targetTupleTy = n->getTargetTupleExpAST()->accept(*this);
   auto tupleTy = MyType::toTupleType(targetTupleTy);
   if (tupleTy != nullptr){
-    if (n->getIndex() >= tupleTy->getLength())
-      reportError(n->getSrcLoc(), "Proj error. Index >= tuple list size");
+    if (n->getIndex() >= tupleTy->getLength()){
+      reportError(n->getSrcLoc(), "ProjExp Error: Index >= tuple list size");
+      return MyType::getIntType();
+    }
     return tupleTy->getType(n->getIndex());
   }
-  reportError(n->getSrcLoc(), "Project error, dyn_cast fails");
-  return NULL;
+  reportError(n->getSrcLoc(), "ProjExp Error: target is not Tuple Type");
+  return MyType::getIntType();
 }
 
 // Rule 8;
@@ -163,12 +157,13 @@ MyType *TypeChecker::visit(CallExpAST *n) {
   auto argTy = n->getArgExpAST()->accept(*this);
   if (!funTy->isFunType()){
     reportError(n->getSrcLoc(), "CallExp Error: exp is not a function type");
+    return MyType::getIntType();
   }
   // check that supplied arg type = declared arg type
   auto declTy = MyType::toFunType(funTy)->getParamType();
-
   if (!MyType::equals(argTy, declTy)){
-    reportError(n->getSrcLoc(), "CallExp error: argTy and declTy mistmatches");
+    reportError(n->getSrcLoc(), "CallExp Error: argTy and declTy mistmatches");
+    return MyType::getIntType();
   }
   return MyType::toFunType(funTy)->getRetType();
 }
@@ -181,9 +176,11 @@ MyType *TypeChecker::visit(WhileExpAST *n) {
   auto bodyTy = bodyExp->accept(*this);
   if (!MyType::equals(condTy, MyType::getIntType())) {
     reportError(n->getSrcLoc(), "WhileExp Error: Cond type must be int");
+    return MyType::getIntType();
   }
   if (!MyType::equals(bodyTy, MyType::getUnitType())) {
     reportError(n->getSrcLoc(), "WhileExp Error: body type must be unit");
+    return MyType::getIntType();
   }
   return MyType::getUnitType();
 }
@@ -203,7 +200,8 @@ MyType *TypeChecker::visit(LetExpAST *n) {
 MyType *TypeChecker::visit(ConstrainExpAST *n) {
   auto expTy = n->getExpAST()->accept(*this);
   if (!MyType::equals(expTy, MyType::getType(n->getTypeAST()))){
-    reportError(n->getSrcLoc(), "Constrain Error: Exp and tp does not match");
+    reportError(n->getSrcLoc(), "ConstrainExp Error: Exp and tp does not match");
+    return MyType::getIntType();
   }
   return expTy;
 }
@@ -214,11 +212,11 @@ MyType *TypeChecker::visit(FunDeclAST *n) {
   auto paramTy = MyType::getType(n->getParamTypeAST());
   auto funTy = MyType::getFunType(paramTy, retTy);
   ctxt.bind(n->getName(), funTy);
-
   ctxt.bind(n->getParamName(), paramTy); // for body checking
   auto body_ty = n->getBodyExpAST()->accept(*this);
   if (!MyType::equals(body_ty, retTy)) {
-    reportError(n->getSrcLoc(), "FunDecl: body vs. ret mistmatch");
+    reportError(n->getSrcLoc(), "FunDeclExp Error: body vs. ret type mistmatches");
+    return MyType::getIntType();
   }
   ctxt.undoOne(); // clean up the param
   return funTy;
@@ -230,7 +228,7 @@ MyType *TypeChecker::visit(ProgramAST *n) {
   // Traverse each function declartion in a DFS manner
   const std::map<std::string, FunDeclAST *> &funDecls = n->getFunDeclASTs();
   for (auto it = funDecls.begin(); it != funDecls.end(); ++it) {
-    std::cout << "DFS funcdel name: " << it->second->getName() << "\n";
+    // std::cout << "DFS funcdel name: " << it->second->getName() << "\n";
     it->second->accept(*this);
   }
   return NULL;
