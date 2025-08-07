@@ -40,7 +40,7 @@ public:
 
 private:
   // TODO You can add new helper functions or members here if you need.
-
+  Type* codegenType(MyType* t);
 
   void reportErrorAndExit(SrcLoc srcLoc, std::string msg) const {
     std::cerr << srcFileName << ":" << srcLoc.line << ":" << srcLoc.col
