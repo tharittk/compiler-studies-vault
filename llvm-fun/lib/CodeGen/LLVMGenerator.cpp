@@ -103,6 +103,8 @@ Value *LLVMGenerator::visit(CallExpAST *n)
   Function *CalleeF = module->getFunction(funV->getName());
 
   Value *argV = argExp->accept(*this);
+  // AllocaInst* inst = dyn_cast<AllocaInst>(argV);
+  // builder.CreateLoad(inst->getAllocatedType(), inst, "var_name");
   return builder.CreateCall(CalleeF, argV, "callf");
 }
 
@@ -137,13 +139,18 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
   Function::arg_iterator AI = F->arg_begin();
   AI->setName(n->getParamName());
 
-  // no need for this since LLVM uses module "context" for functions
+  Value *allocaInst = builder.CreateAlloca(toLLVMType(paramTy), nullptr, AI->getName());
+  // Value *loadInst = builder.CreateLoad(allocaInst, "stackload");
+  ctxt.bind(n->getParamName(), allocaInst);
+  // ctxt.bind(n->getParamName(), /*TODO: function on stak*/ ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 2, "dummy"));
+
   BasicBlock *BB = BasicBlock::Create(getGlobalContext(), "entry", F);
   builder.SetInsertPoint(BB);
   if (Value *retVal = n->getBodyExpAST()->accept(*this))
   {
     builder.CreateRet(retVal);
     verifyFunction(*F);
+    ctxt.bind(n->getName(), F);
     return F;
   }
   return NULL;
@@ -165,7 +172,7 @@ Value *LLVMGenerator::visit(IfExpAST *n)
   if (condV == 0)
     return 0;
   // convert condition to a bool
-  condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ifcond");
+  condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt1Ty(getGlobalContext()), 0), "ifcond");
   Function *F = builder.GetInsertBlock()->getParent();
 
   // automatically insert ThenBB to the end of the function F
@@ -304,7 +311,9 @@ Value *LLVMGenerator::visit(UnExpAST *n)
     builder.SetInsertPoint(condBB);
 
     Value *v = n->getExp1AST()->accept(*this);
-    Value *condV = builder.CreateICmpNE(v, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "notCond");
+    // Value *condV = builder.CreateICmpNE(v, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "notCond");
+
+    Value *condV = builder.CreateICmpNE(v, v, "notCond");
     builder.CreateCondBr(condV, /*true*/ trueBB, /*false*/ falseBB);
 
     F->getBasicBlockList().push_back(trueBB);
@@ -328,11 +337,11 @@ Value *LLVMGenerator::visit(UnExpAST *n)
   }
   case OpKind::OP_Ref:
   {
-    // create a ptr from it
+    // Fun's semantic use heap
+    Function *F = builder.GetInsertBlock()->getParent();
     Value *expV = n->getExp1AST()->accept(*this);
-    Value *allocInst = builder.CreateAlloca(expV->getType(), expV, "allocaRef");
-    Value *ptr = builder.CreateGEP(allocInst, 0, "refPtr");
-    return ptr;
+    Value *heapInst = allocHeap(expV->getType(), &F->getEntryBlock(), "allocRefHeap");
+    return heapInst;
   }
 
   case OpKind::OP_Get:
@@ -386,8 +395,13 @@ Type *LLVMGenerator::toLLVMType(MyType *t)
   }
   else if (t->isTupleType())
   {
-    // TODO: what should be here ? The is no generalize struct type
-    return Type::getVoidTy(getGlobalContext());
+    std::vector<Type *> llvmTys;
+    MyTupleType *mt = dyn_cast<MyTupleType>(t);
+    for (const auto ty : mt->getTypes())
+    {
+      llvmTys.push_back(toLLVMType(ty));
+    }
+    return StructType::get(getGlobalContext(), llvmTys);
   }
   else
   {
