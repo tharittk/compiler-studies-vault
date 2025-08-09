@@ -103,8 +103,6 @@ Value *LLVMGenerator::visit(CallExpAST *n)
   Function *CalleeF = module->getFunction(funV->getName());
 
   Value *argV = argExp->accept(*this);
-  // AllocaInst* inst = dyn_cast<AllocaInst>(argV);
-  // builder.CreateLoad(inst->getAllocatedType(), inst, "var_name");
   return builder.CreateCall(CalleeF, argV, "callf");
 }
 
@@ -139,13 +137,13 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
   Function::arg_iterator AI = F->arg_begin();
   AI->setName(n->getParamName());
 
-  Value *allocaInst = builder.CreateAlloca(toLLVMType(paramTy), nullptr, AI->getName());
-  // Value *loadInst = builder.CreateLoad(allocaInst, "stackload");
-  ctxt.bind(n->getParamName(), allocaInst);
-  // ctxt.bind(n->getParamName(), /*TODO: function on stak*/ ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 2, "dummy"));
-
   BasicBlock *BB = BasicBlock::Create(getGlobalContext(), "entry", F);
   builder.SetInsertPoint(BB);
+
+  Value *allocaInst = builder.CreateAlloca(toLLVMType(paramTy), nullptr, AI->getName());
+  builder.CreateStore(AI, allocaInst);
+  ctxt.bind(n->getParamName(), allocaInst);
+
   if (Value *retVal = n->getBodyExpAST()->accept(*this))
   {
     builder.CreateRet(retVal);
@@ -163,7 +161,11 @@ Value *LLVMGenerator::visit(IdExpAST *n)
     auto msg = "IdExp Error: " + n->getName() + " is not in env";
     reportErrorAndExit(n->getSrcLoc(), msg);
   }
-  return ctxt.get(n->getName());
+
+  Value *v = ctxt.get(n->getName());
+  if (auto *allocInst = dyn_cast<AllocaInst>(v))
+    return builder.CreateLoad(allocInst, "loadFromScope");
+  return v;
 }
 
 Value *LLVMGenerator::visit(IfExpAST *n)
