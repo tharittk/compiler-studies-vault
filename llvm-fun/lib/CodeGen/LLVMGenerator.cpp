@@ -131,12 +131,14 @@ Value *LLVMGenerator::visit(BinExpAST *n)
     builder.SetInsertPoint(rhsBlock);
     Value *condE2 = builder.CreateICmpNE(
         R, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ore2");
+
+    Value *condE2Zext = builder.CreateZExt(condE2, Type::getInt32Ty(getGlobalContext()));
     builder.CreateBr(mergeBlock);
 
     builder.SetInsertPoint(mergeBlock);
     PHINode *phi = builder.CreatePHI(Type::getInt32Ty(getGlobalContext()), 2, "or.result");
     phi->addIncoming(ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 1), lhsBlock);
-    phi->addIncoming(builder.CreateZExt(condE2, Type::getInt32Ty(getGlobalContext())), rhsBlock);
+    phi->addIncoming(condE2Zext, rhsBlock);
     return phi;
   }
 
@@ -146,7 +148,6 @@ Value *LLVMGenerator::visit(BinExpAST *n)
       return builder.CreateStore(R, allocInst);
     return builder.CreateStore(R, L);
   }
-    return builder.CreateStore(R, L);
   default:
   {
     reportErrorAndExit(n->getSrcLoc(), "BinExp Error: No case matches");
@@ -157,17 +158,14 @@ Value *LLVMGenerator::visit(BinExpAST *n)
 
 Value *LLVMGenerator::visit(CallExpAST *n)
 {
-  auto funExp = n->getFunExpAST();
-  auto argExp = n->getArgExpAST();
-
   // simple because our language supports only one variable
-  Value *funV = funExp->accept(*this);
+  Value *funV = n->getFunExpAST()->accept(*this);
   if (!dyn_cast<Function>(funV))
     reportErrorAndExit(n->getSrcLoc(), "CallExp Error: dyn_cast test of funV must be Function Type");
 
   // LLVM handles the stack arithmatic
   Function *CalleeF = module->getFunction(funV->getName());
-  Value *argV = argExp->accept(*this);
+  Value *argV = n->getArgExpAST()->accept(*this);
   return builder.CreateCall(CalleeF, argV, "call");
 }
 
@@ -207,14 +205,15 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
   builder.CreateStore(AI, allocaInst);
   ctxt.bind(n->getParamName(), allocaInst);
 
+  // TODO: move it here? so that it allows recursive call
+  // TODO: this binding is for IdExpAST parsing (ctxt->F)
+  // but the actual function instance is accessed through globalContext() still
+  // Is this redundant ?
+  ctxt.bind(n->getName(), F);
   if (Value *retVal = n->getBodyExpAST()->accept(*this))
   {
     builder.CreateRet(retVal);
     verifyFunction(*F);
-    // TODO: this binding is for IdExpAST parsing (ctxt->F)
-    // but the actual function instance is accessed through globalContext() still
-    // Is this redundant ?
-    ctxt.bind(n->getName(), F);
     return F;
   }
   return NULL;
@@ -354,7 +353,6 @@ Value *LLVMGenerator::visit(TupleExpAST *n)
 
 Value *LLVMGenerator::visit(UnExpAST *n)
 {
-
   switch (n->getOp())
   {
   case OpKind::OP_UMinus:
@@ -370,13 +368,11 @@ Value *LLVMGenerator::visit(UnExpAST *n)
   {
     Value *v = n->getExp1AST()->accept(*this);
     assert(v && "Operand for NOT is null");
-
     // Compare with 0 → yields i1 (true if equal to 0)
     Value *isZero = builder.CreateICmpEQ(
         v,
         ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0),
         "isZero");
-
     // Zero-extend i1 to i32 (0 → 0, true → 1)
     Value *result = builder.CreateZExt(isZero, Type::getInt32Ty(getGlobalContext()), "not");
     return result;
@@ -389,7 +385,6 @@ Value *LLVMGenerator::visit(UnExpAST *n)
     Value *heapInst = allocHeap(expV->getType(), &F->getEntryBlock(), "allocRefHeap");
     return heapInst;
   }
-
   case OpKind::OP_Get:
   {
     Value *expV = n->getExp1AST()->accept(*this);
