@@ -68,21 +68,85 @@ Value *LLVMGenerator::visit(BinExpAST *n)
   switch (n->getOp())
   {
   case OpKind::OP_Add:
-    return this->builder.CreateAdd(L, R, "addf");
+    return builder.CreateAdd(L, R, "addInt");
   case OpKind::OP_Sub:
-    return this->builder.CreateSub(L, R, "subf");
+    return builder.CreateSub(L, R, "subInt");
   case OpKind::OP_Mul:
-    return this->builder.CreateMul(L, R, "mulf");
+    return builder.CreateMul(L, R, "mulInt");
   case OpKind::OP_Equal:
-    return this->builder.CreateICmp(CmpInst::ICMP_EQ, L, R, "eqf");
+  {
+    Value *cond = builder.CreateICmp(CmpInst::ICMP_EQ, L, R, "eqInt");
+    Value *condZext = builder.CreateZExt(cond, Type::getInt32Ty(getGlobalContext()));
+    return condZext;
+  }
   case OpKind::OP_LT:
-    return this->builder.CreateICmp(CmpInst::ICMP_SLT, L, R, "ltf");
+  {
+    Value *cond = builder.CreateICmp(CmpInst::ICMP_SLT, L, R, "ltInt");
+    Value *condZext = builder.CreateZExt(cond, Type::getInt32Ty(getGlobalContext()));
+    return condZext;
+  }
   case OpKind::OP_And:
-    return this->builder.CreateAnd(L, R, "andf");
+  {
+    // e1 && e2 → short-circuit
+    Function *F = builder.GetInsertBlock()->getParent();
+
+    BasicBlock *rhsBlock = BasicBlock::Create(getGlobalContext(), "and.rhs", F);
+    BasicBlock *mergeBlock = BasicBlock::Create(getGlobalContext(), "and.merge", F);
+
+    Value *condE1 = builder.CreateICmpNE(
+        L, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ande1");
+    BasicBlock *lhsBlock = builder.GetInsertBlock(); // save predecessor before changing IP
+
+    builder.CreateCondBr(condE1, rhsBlock, mergeBlock);
+
+    // Evaluate e2 only if e1 != 0
+    builder.SetInsertPoint(rhsBlock);
+    Value *condE2 = builder.CreateICmpNE(
+        R, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ande2");
+    builder.CreateBr(mergeBlock);
+
+    // Merge result
+    builder.SetInsertPoint(mergeBlock);
+    PHINode *phi = builder.CreatePHI(Type::getInt32Ty(getGlobalContext()), 2, "and.result");
+    phi->addIncoming(ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), lhsBlock);
+    phi->addIncoming(builder.CreateZExt(condE2, Type::getInt32Ty(getGlobalContext())), rhsBlock);
+    return phi;
+  }
+
   case OpKind::OP_Or:
-    return this->builder.CreateOr(L, R, "orf");
+  {
+    // e1 || e2 → short-circuit
+    Function *F = builder.GetInsertBlock()->getParent();
+
+    BasicBlock *rhsBlock = BasicBlock::Create(getGlobalContext(), "or.rhs", F);
+    BasicBlock *mergeBlock = BasicBlock::Create(getGlobalContext(), "or.merge", F);
+
+    Value *condE1 = builder.CreateICmpNE(
+        L, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ore1");
+
+    BasicBlock *lhsBlock = builder.GetInsertBlock();
+    builder.CreateCondBr(condE1, mergeBlock, rhsBlock);
+
+    // Merge result: if e1 != 0 → 1, else evaluate e2
+    builder.SetInsertPoint(rhsBlock);
+    Value *condE2 = builder.CreateICmpNE(
+        R, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ore2");
+    builder.CreateBr(mergeBlock);
+
+    builder.SetInsertPoint(mergeBlock);
+    PHINode *phi = builder.CreatePHI(Type::getInt32Ty(getGlobalContext()), 2, "or.result");
+    phi->addIncoming(ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 1), lhsBlock);
+    phi->addIncoming(builder.CreateZExt(condE2, Type::getInt32Ty(getGlobalContext())), rhsBlock);
+    return phi;
+  }
+
   case OpKind::OP_Set:
-    return this->builder.CreateStore(R, L);
+  {
+    if (auto *allocInst = dyn_cast<AllocaInst>(L))
+      return builder.CreateStore(R, allocInst);
+    return builder.CreateStore(R, L);
+  }
+    return builder.CreateStore(R, L);
   default:
   {
     reportErrorAndExit(n->getSrcLoc(), "BinExp Error: No case matches");
@@ -100,10 +164,11 @@ Value *LLVMGenerator::visit(CallExpAST *n)
   Value *funV = funExp->accept(*this);
   if (!dyn_cast<Function>(funV))
     reportErrorAndExit(n->getSrcLoc(), "CallExp Error: dyn_cast test of funV must be Function Type");
-  Function *CalleeF = module->getFunction(funV->getName());
 
+  // LLVM handles the stack arithmatic
+  Function *CalleeF = module->getFunction(funV->getName());
   Value *argV = argExp->accept(*this);
-  return builder.CreateCall(CalleeF, argV, "callf");
+  return builder.CreateCall(CalleeF, argV, "call");
 }
 
 Value *LLVMGenerator::visit(ConstrainExpAST *n)
@@ -118,10 +183,8 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
   // register function to environment
   auto retTy = MyType::getType(n->getRetTypeAST());
   auto paramTy = MyType::getType(n->getParamTypeAST());
-  // case swtich, int, ref, fun ,tuple, unit
   FunctionType *FT = FunctionType::get(/*return ty*/ toLLVMType(retTy),
                                        /*arg ty*/ toLLVMType(paramTy), /*vararg*/ false);
-
   // register to the module for symbol look up
   Function *F = Function::Create(FT, Function::ExternalLinkage, n->getName(), module);
 
@@ -132,7 +195,6 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
     F->eraseFromParent();
     F = module->getFunction(n->getName());
   }
-
   // function in our language takes only one argument
   Function::arg_iterator AI = F->arg_begin();
   AI->setName(n->getParamName());
@@ -140,6 +202,7 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
   BasicBlock *BB = BasicBlock::Create(getGlobalContext(), "entry", F);
   builder.SetInsertPoint(BB);
 
+  // Store the supplied function argument to the allocate slot in stack
   Value *allocaInst = builder.CreateAlloca(toLLVMType(paramTy), nullptr, AI->getName());
   builder.CreateStore(AI, allocaInst);
   ctxt.bind(n->getParamName(), allocaInst);
@@ -148,6 +211,9 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
   {
     builder.CreateRet(retVal);
     verifyFunction(*F);
+    // TODO: this binding is for IdExpAST parsing (ctxt->F)
+    // but the actual function instance is accessed through globalContext() still
+    // Is this redundant ?
     ctxt.bind(n->getName(), F);
     return F;
   }
@@ -164,7 +230,7 @@ Value *LLVMGenerator::visit(IdExpAST *n)
 
   Value *v = ctxt.get(n->getName());
   if (auto *allocInst = dyn_cast<AllocaInst>(v))
-    return builder.CreateLoad(allocInst, "loadFromScope");
+    return builder.CreateLoad(allocInst, "loadId");
   return v;
 }
 
@@ -174,7 +240,7 @@ Value *LLVMGenerator::visit(IfExpAST *n)
   if (condV == 0)
     return 0;
   // convert condition to a bool
-  condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt1Ty(getGlobalContext()), 0), "ifcond");
+  condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ifcondI");
   Function *F = builder.GetInsertBlock()->getParent();
 
   // automatically insert ThenBB to the end of the function F
@@ -187,7 +253,7 @@ Value *LLVMGenerator::visit(IfExpAST *n)
 
   // set current insertion point to the end of ThenBB but ThenBB is empty so we are ok
   builder.SetInsertPoint(ThenBB);
-  Value *thenV = n->getThenExpAST()->accept(*this); // codegen
+  Value *thenV = n->getThenExpAST()->accept(*this);
   if (thenV == 0)
     return 0;
   // unconditional branch then->merge. LLVM requires that every BB has a terminator (ret or br)
@@ -251,7 +317,7 @@ Value *LLVMGenerator::visit(ProjExpAST *n)
   Value *targetTupleAlloca = n->getTargetTupleExpAST()->accept(*this);
   // if (!tupleV) // must be tuple/vector, depending on how you represent it
   //   reportErrorAndExit(n->getSrcLoc(), "ProjExp Error: target Value must be a vector");
-  Value *ptr = builder.CreateStructGEP(targetTupleAlloca, n->getIndex(), "load.ptr");
+  Value *ptr = builder.CreateStructGEP(targetTupleAlloca, n->getIndex(), "loadPtr");
   Value *loadInst = builder.CreateLoad(ptr, "projLoad");
   return loadInst;
 }
@@ -302,40 +368,18 @@ Value *LLVMGenerator::visit(UnExpAST *n)
   }
   case OpKind::OP_Not:
   {
-    // compare with zero,
-    Function *F = builder.GetInsertBlock()->getParent();
-    BasicBlock *condBB = BasicBlock::Create(getGlobalContext(), "notCond", F);
-    BasicBlock *trueBB = BasicBlock::Create(getGlobalContext(), "trueBr");
-    BasicBlock *falseBB = BasicBlock::Create(getGlobalContext(), "falseBr");
-    BasicBlock *MergeBB = BasicBlock::Create(getGlobalContext(), "mergeNot");
-
-    builder.CreateBr(condBB);
-    builder.SetInsertPoint(condBB);
-
     Value *v = n->getExp1AST()->accept(*this);
-    // Value *condV = builder.CreateICmpNE(v, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "notCond");
+    assert(v && "Operand for NOT is null");
 
-    Value *condV = builder.CreateICmpNE(v, v, "notCond");
-    builder.CreateCondBr(condV, /*true*/ trueBB, /*false*/ falseBB);
+    // Compare with 0 → yields i1 (true if equal to 0)
+    Value *isZero = builder.CreateICmpEQ(
+        v,
+        ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0),
+        "isZero");
 
-    F->getBasicBlockList().push_back(trueBB);
-    builder.SetInsertPoint(trueBB);
-    Value *zeroV = ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0, /*isSigned=*/true);
-
-    builder.CreateBr(MergeBB);
-
-    F->getBasicBlockList().push_back(falseBB);
-    builder.SetInsertPoint(falseBB);
-    Value *oneV = ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 1, /*isSigned=*/true);
-    builder.CreateBr(MergeBB);
-
-    F->getBasicBlockList().push_back(MergeBB);
-    builder.SetInsertPoint(MergeBB);
-
-    PHINode *PN = builder.CreatePHI(Type::getInt32Ty(getGlobalContext()), 2, "nottmp");
-    PN->addIncoming(zeroV, trueBB);
-    PN->addIncoming(oneV, falseBB);
-    return PN;
+    // Zero-extend i1 to i32 (0 → 0, true → 1)
+    Value *result = builder.CreateZExt(isZero, Type::getInt32Ty(getGlobalContext()), "not");
+    return result;
   }
   case OpKind::OP_Ref:
   {
