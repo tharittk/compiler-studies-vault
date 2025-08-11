@@ -55,6 +55,7 @@ Value *LLVMGenerator::allocHeap(Type *t, BasicBlock *bb, std::string name)
   return inst;
 }
 
+//--------------------------------Binary Op---------------------------------------------
 Value *LLVMGenerator::visit(BinExpAST *n)
 {
   auto leftExp = n->getExp1AST();
@@ -68,20 +69,20 @@ Value *LLVMGenerator::visit(BinExpAST *n)
   switch (n->getOp())
   {
   case OpKind::OP_Add:
-    return builder.CreateAdd(L, R, "addInt");
+    return builder.CreateAdd(L, R, "bin.add");
   case OpKind::OP_Sub:
-    return builder.CreateSub(L, R, "subInt");
+    return builder.CreateSub(L, R, "bin.sub");
   case OpKind::OP_Mul:
-    return builder.CreateMul(L, R, "mulInt");
+    return builder.CreateMul(L, R, "bin.mul");
   case OpKind::OP_Equal:
   {
-    Value *cond = builder.CreateICmp(CmpInst::ICMP_EQ, L, R, "eqInt");
+    Value *cond = builder.CreateICmp(CmpInst::ICMP_EQ, L, R, "bin.eq");
     Value *condZext = builder.CreateZExt(cond, Type::getInt32Ty(getGlobalContext()));
     return condZext;
   }
   case OpKind::OP_LT:
   {
-    Value *cond = builder.CreateICmp(CmpInst::ICMP_SLT, L, R, "ltInt");
+    Value *cond = builder.CreateICmp(CmpInst::ICMP_SLT, L, R, "bin.lt");
     Value *condZext = builder.CreateZExt(cond, Type::getInt32Ty(getGlobalContext()));
     return condZext;
   }
@@ -94,7 +95,7 @@ Value *LLVMGenerator::visit(BinExpAST *n)
     BasicBlock *mergeBlock = BasicBlock::Create(getGlobalContext(), "and.merge", F);
 
     Value *condE1 = builder.CreateICmpNE(
-        L, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ande1");
+        L, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "and.e1");
     BasicBlock *lhsBlock = builder.GetInsertBlock(); // save predecessor before changing IP
 
     builder.CreateCondBr(condE1, rhsBlock, mergeBlock);
@@ -102,7 +103,7 @@ Value *LLVMGenerator::visit(BinExpAST *n)
     // Evaluate e2 only if e1 != 0
     builder.SetInsertPoint(rhsBlock);
     Value *condE2 = builder.CreateICmpNE(
-        R, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ande2");
+        R, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "and.e2");
     builder.CreateBr(mergeBlock);
 
     // Merge result
@@ -122,7 +123,7 @@ Value *LLVMGenerator::visit(BinExpAST *n)
     BasicBlock *mergeBlock = BasicBlock::Create(getGlobalContext(), "or.merge", F);
 
     Value *condE1 = builder.CreateICmpNE(
-        L, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ore1");
+        L, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "or.e1");
 
     BasicBlock *lhsBlock = builder.GetInsertBlock();
     builder.CreateCondBr(condE1, mergeBlock, rhsBlock);
@@ -130,7 +131,7 @@ Value *LLVMGenerator::visit(BinExpAST *n)
     // Merge result: if e1 != 0 → 1, else evaluate e2
     builder.SetInsertPoint(rhsBlock);
     Value *condE2 = builder.CreateICmpNE(
-        R, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ore2");
+        R, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "or.e2");
 
     Value *condE2Zext = builder.CreateZExt(condE2, Type::getInt32Ty(getGlobalContext()));
     builder.CreateBr(mergeBlock);
@@ -156,67 +157,57 @@ Value *LLVMGenerator::visit(BinExpAST *n)
   }
 }
 
-Value *LLVMGenerator::visit(CallExpAST *n)
+//--------------------------------Unary Op---------------------------------------------
+Value *LLVMGenerator::visit(UnExpAST *n)
 {
-  // simple because our language supports only one variable
-  Value *funV = n->getFunExpAST()->accept(*this);
-  if (!dyn_cast<Function>(funV))
-    reportErrorAndExit(n->getSrcLoc(), "CallExp Error: dyn_cast test of funV must be Function Type");
-
-  // LLVM handles the stack arithmatic
-  Function *CalleeF = module->getFunction(funV->getName());
-  Value *argV = n->getArgExpAST()->accept(*this);
-  return builder.CreateCall(CalleeF, argV, "call");
+  switch (n->getOp())
+  {
+  case OpKind::OP_UMinus:
+  {
+    // apply minus to exp
+    Value *v = n->getExp1AST()->accept(*this);
+    ConstantInt *constInt = dyn_cast<ConstantInt>(v);
+    if (!constInt)
+      reportErrorAndExit(n->getSrcLoc(), "UMinus must be applied to Int");
+    return ConstantInt::get(v->getType(), -constInt->getValue());
+  }
+  case OpKind::OP_Not:
+  {
+    Value *v = n->getExp1AST()->accept(*this);
+    assert(v && "Operand for NOT is null");
+    // Compare with 0 → yields i1 (true if equal to 0)
+    Value *isZero = builder.CreateICmpEQ(
+        v,
+        ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0),
+        "isZero");
+    // Zero-extend i1 to i32 (0 → 0, true → 1)
+    Value *result = builder.CreateZExt(isZero, Type::getInt32Ty(getGlobalContext()), "not");
+    return result;
+  }
+  case OpKind::OP_Ref:
+  {
+    // Fun's semantic use heap
+    Function *F = builder.GetInsertBlock()->getParent();
+    Value *expV = n->getExp1AST()->accept(*this);
+    Value *heapInst = allocHeap(expV->getType(), &F->getEntryBlock(), "allocRefHeap");
+    return heapInst;
+  }
+  case OpKind::OP_Get:
+  {
+    Value *expV = n->getExp1AST()->accept(*this);
+    // you may do dyn_cast here
+    return builder.CreateLoad(expV, "loadGet");
+  }
+  default:
+    reportErrorAndExit(n->getSrcLoc(), "UnExp Error: case does not match");
+    return NULL;
+  }
 }
 
-Value *LLVMGenerator::visit(ConstrainExpAST *n)
+//--------------------------------Terminal---------------------------------------------
+Value *LLVMGenerator::visit(IntExpAST *n)
 {
-  // constrain is for type checking. It doesn't make
-  // any difference in IR generation
-  return n->getExpAST()->accept(*this);
-}
-
-Value *LLVMGenerator::visit(FunDeclAST *n)
-{
-  // register function to environment
-  auto retTy = MyType::getType(n->getRetTypeAST());
-  auto paramTy = MyType::getType(n->getParamTypeAST());
-  FunctionType *FT = FunctionType::get(/*return ty*/ toLLVMType(retTy),
-                                       /*arg ty*/ toLLVMType(paramTy), /*vararg*/ false);
-  // register to the module for symbol look up
-  Function *F = Function::Create(FT, Function::ExternalLinkage, n->getName(), module);
-
-  // llvm semantic, if the symbol already exists, F will be automatically renamed
-  // and thus not equal to intended name
-  if (F->getName() != n->getName())
-  {
-    F->eraseFromParent();
-    F = module->getFunction(n->getName());
-  }
-  // function in our language takes only one argument
-  Function::arg_iterator AI = F->arg_begin();
-  AI->setName(n->getParamName());
-
-  BasicBlock *BB = BasicBlock::Create(getGlobalContext(), "entry", F);
-  builder.SetInsertPoint(BB);
-
-  // Store the supplied function argument to the allocate slot in stack
-  Value *allocaInst = builder.CreateAlloca(toLLVMType(paramTy), nullptr, AI->getName());
-  builder.CreateStore(AI, allocaInst);
-  ctxt.bind(n->getParamName(), allocaInst);
-
-  // TODO: move it here? so that it allows recursive call
-  // TODO: this binding is for IdExpAST parsing (ctxt->F)
-  // but the actual function instance is accessed through globalContext() still
-  // Is this redundant ?
-  ctxt.bind(n->getName(), F);
-  if (Value *retVal = n->getBodyExpAST()->accept(*this))
-  {
-    builder.CreateRet(retVal);
-    verifyFunction(*F);
-    return F;
-  }
-  return NULL;
+  return ConstantInt::get(Type::getInt32Ty(getGlobalContext()), n->getNum(), /*isSigned=*/true);
 }
 
 Value *LLVMGenerator::visit(IdExpAST *n)
@@ -226,26 +217,41 @@ Value *LLVMGenerator::visit(IdExpAST *n)
     auto msg = "IdExp Error: " + n->getName() + " is not in env";
     reportErrorAndExit(n->getSrcLoc(), msg);
   }
-
   Value *v = ctxt.get(n->getName());
   if (auto *allocInst = dyn_cast<AllocaInst>(v))
-    return builder.CreateLoad(allocInst, "loadId");
+    return builder.CreateLoad(allocInst, "id.load");
   return v;
 }
 
+//--------------------------------No-effect---------------------------------------------
+Value *LLVMGenerator::visit(SeqExpAST *n)
+{
+  n->getExp1AST()->accept(*this);
+  Value *v = n->getExp2AST()->accept(*this);
+  return v;
+}
+
+Value *LLVMGenerator::visit(ConstrainExpAST *n)
+{
+  // constrain is for type checking. It doesn't make
+  // any difference in IR generation
+  return n->getExpAST()->accept(*this);
+}
+
+//--------------------------------Control Flow---------------------------------------------
 Value *LLVMGenerator::visit(IfExpAST *n)
 {
   Value *condV = n->getCondExpAST()->accept(*this); // codegen
   if (condV == 0)
     return 0;
   // convert condition to a bool
-  condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "ifcondI");
+  condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "if.cond");
   Function *F = builder.GetInsertBlock()->getParent();
 
   // automatically insert ThenBB to the end of the function F
-  BasicBlock *ThenBB = BasicBlock::Create(getGlobalContext(), "then", F);
-  BasicBlock *ElseBB = BasicBlock::Create(getGlobalContext(), "else");
-  BasicBlock *MergeBB = BasicBlock::Create(getGlobalContext(), "ifcont");
+  BasicBlock *ThenBB = BasicBlock::Create(getGlobalContext(), "if.then", F);
+  BasicBlock *ElseBB = BasicBlock::Create(getGlobalContext(), "if.else");
+  BasicBlock *MergeBB = BasicBlock::Create(getGlobalContext(), "if.merge");
 
   // this is generated inside the cond block
   builder.CreateCondBr(condV, ThenBB, ElseBB);
@@ -277,15 +283,37 @@ Value *LLVMGenerator::visit(IfExpAST *n)
   builder.SetInsertPoint(MergeBB);
 
   // TODO (tharitt): check the type incoming. Should it always be int ?
-  PHINode *PN = builder.CreatePHI(Type::getInt32Ty(getGlobalContext()), 2, "iftmp");
+  PHINode *PN = builder.CreatePHI(Type::getInt32Ty(getGlobalContext()), 2, "if.phi");
   PN->addIncoming(thenV, ThenBB);
   PN->addIncoming(elseV, ElseBB);
   return PN;
 }
 
-Value *LLVMGenerator::visit(IntExpAST *n)
+Value *LLVMGenerator::visit(WhileExpAST *n)
 {
-  return ConstantInt::get(Type::getInt32Ty(getGlobalContext()), n->getNum(), /*isSigned=*/true);
+
+  Function *F = builder.GetInsertBlock()->getParent();
+  BasicBlock *CondBB = BasicBlock::Create(getGlobalContext(), "whileCond", F);
+  BasicBlock *LoopBB = BasicBlock::Create(getGlobalContext(), "loop", F);
+  BasicBlock *AfterLoopBB = BasicBlock::Create(getGlobalContext(), "afterLoop", F);
+
+  // connect the (whatever it is) current block to the CondBB unconditionally
+  builder.CreateBr(CondBB);
+
+  builder.SetInsertPoint(CondBB);
+  Value *condV = n->getCondExpAST()->accept(*this);
+  if (condV == 0)
+    return 0;
+  condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "whilePred");
+  builder.CreateCondBr(condV, /*true*/ LoopBB, /*false*/ AfterLoopBB); // emit right after cmp
+
+  builder.SetInsertPoint(LoopBB);
+  Value *bodyV = n->getBodyExpAST()->accept(*this); // codegen
+  if (bodyV == 0)
+    return 0;
+  builder.CreateBr(CondBB); // backedge to check the condition
+  // while should return unit type
+  return Constant::getNullValue(Type::getInt32Ty(getGlobalContext()));
 }
 
 Value *LLVMGenerator::visit(LetExpAST *n)
@@ -301,6 +329,7 @@ Value *LLVMGenerator::visit(LetExpAST *n)
   return bodyV;
 }
 
+//--------------------------------Program Init---------------------------------------------
 Value *LLVMGenerator::RegisterPrintIntIR()
 {
   FunctionType *printfType = FunctionType::get(Type::getInt32Ty(getGlobalContext()),
@@ -345,20 +374,36 @@ Value *LLVMGenerator::visit(ProgramAST *n)
   return NULL;
 }
 
-Value *LLVMGenerator::visit(SeqExpAST *n)
+//--------------------------------Working---------------------------------------------
+
+Type *LLVMGenerator::toLLVMType(MyType *t)
 {
-  n->getExp1AST()->accept(*this);
-  Value *v = n->getExp2AST()->accept(*this);
-  return v;
+  if (t->isIntType())
+  {
+    return Type::getInt32Ty(getGlobalContext());
+  }
+  else if (t->isRefType())
+  {
+    return Type::getInt32PtrTy(getGlobalContext(), true);
+  }
+  else if (t->isTupleType())
+  {
+    std::vector<Type *> llvmTys;
+    MyTupleType *mt = dyn_cast<MyTupleType>(t);
+    for (const auto ty : mt->getTypes())
+    {
+      llvmTys.push_back(toLLVMType(ty));
+    }
+    return StructType::get(getGlobalContext(), llvmTys);
+  }
+  else
+  {
+    /* likely function type */
+    std::cerr << "You use type from MyType -> LLVM Type the wrong way !";
+    return Type::getVoidTy(getGlobalContext());
+  }
 }
 
-// Value *LLVMGenerator::visit(ProjExpAST *n)
-// {
-//   Value *targetTupleAlloca = n->getTargetTupleExpAST()->accept(*this);
-//   Value *ptr = builder.CreateStructGEP(targetTupleAlloca, n->getIndex(), "loadPtr");
-//   Value *loadInst = builder.CreateLoad(ptr, "projLoad");
-//   return loadInst;
-// }
 Value *LLVMGenerator::visit(ProjExpAST *n)
 {
   // codegen the target expression
@@ -415,103 +460,64 @@ Value *LLVMGenerator::visit(TupleExpAST *n)
   return structAlloca;
 }
 
-Value *LLVMGenerator::visit(UnExpAST *n)
+Value *LLVMGenerator::visit(CallExpAST *n)
 {
-  switch (n->getOp())
-  {
-  case OpKind::OP_UMinus:
-  {
-    // apply minus to exp
-    Value *v = n->getExp1AST()->accept(*this);
-    ConstantInt *constInt = dyn_cast<ConstantInt>(v);
-    if (!constInt)
-      reportErrorAndExit(n->getSrcLoc(), "UMinus must be applied to Int");
-    return ConstantInt::get(v->getType(), -constInt->getValue());
-  }
-  case OpKind::OP_Not:
-  {
-    Value *v = n->getExp1AST()->accept(*this);
-    assert(v && "Operand for NOT is null");
-    // Compare with 0 → yields i1 (true if equal to 0)
-    Value *isZero = builder.CreateICmpEQ(
-        v,
-        ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0),
-        "isZero");
-    // Zero-extend i1 to i32 (0 → 0, true → 1)
-    Value *result = builder.CreateZExt(isZero, Type::getInt32Ty(getGlobalContext()), "not");
-    return result;
-  }
-  case OpKind::OP_Ref:
-  {
-    // Fun's semantic use heap
-    Function *F = builder.GetInsertBlock()->getParent();
-    Value *expV = n->getExp1AST()->accept(*this);
-    Value *heapInst = allocHeap(expV->getType(), &F->getEntryBlock(), "allocRefHeap");
-    return heapInst;
-  }
-  case OpKind::OP_Get:
-  {
-    Value *expV = n->getExp1AST()->accept(*this);
-    // you may do dyn_cast here
-    return builder.CreateLoad(expV, "loadGet");
-  }
-  default:
-    reportErrorAndExit(n->getSrcLoc(), "UnExp Error: case does not match");
-    return NULL;
-  }
+  // simple because our language supports only one variable
+  Value *funV = n->getFunExpAST()->accept(*this);
+  if (!dyn_cast<Function>(funV))
+    reportErrorAndExit(n->getSrcLoc(), "CallExp Error: dyn_cast test of funV must be Function Type");
+
+  // lookup the actual function by name from the module
+  Function *CalleeF = module->getFunction(funV->getName());
+  if (!CalleeF)
+    reportErrorAndExit(n->getSrcLoc(), "CallExp Error: function not found in module");
+
+  // single-argument language: ensure argument is generated
+  Value *argV = n->getArgExpAST()->accept(*this);
+  if (!argV)
+    reportErrorAndExit(n->getSrcLoc(), "CallExp Error: argument codegen produced null");
+
+  return builder.CreateCall(CalleeF, argV, "call");
 }
 
-Value *LLVMGenerator::visit(WhileExpAST *n)
+Value *LLVMGenerator::visit(FunDeclAST *n)
 {
+  // register function to environment
+  Type *retTy = toLLVMType(MyType::getType(n->getRetTypeAST()));
+  Type *paramTy = toLLVMType(MyType::getType(n->getParamTypeAST()));
 
-  Function *F = builder.GetInsertBlock()->getParent();
-  BasicBlock *CondBB = BasicBlock::Create(getGlobalContext(), "whileCond", F);
-  BasicBlock *LoopBB = BasicBlock::Create(getGlobalContext(), "loop", F);
-  BasicBlock *AfterLoopBB = BasicBlock::Create(getGlobalContext(), "afterLoop", F);
+  // build FunctionType with a 1-element parameter list
+  std::vector<Type *> params;
+  params.push_back(paramTy);
+  FunctionType *FT = FunctionType::get(retTy, ArrayRef<Type *>(params), /*isVarArg=*/false);
 
-  // connect the (whatever it is) current block to the CondBB unconditionally
-  builder.CreateBr(CondBB);
+  // register to the module for symbol look up
+  Function *F = Function::Create(FT, Function::ExternalLinkage, n->getName(), module);
 
-  builder.SetInsertPoint(CondBB);
-  Value *condV = n->getCondExpAST()->accept(*this);
-  if (condV == 0)
-    return 0;
-  condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "whilePred");
-  builder.CreateCondBr(condV, /*true*/ LoopBB, /*false*/ AfterLoopBB); // emit right after cmp
-
-  builder.SetInsertPoint(LoopBB);
-  Value *bodyV = n->getBodyExpAST()->accept(*this); // codegen
-  if (bodyV == 0)
-    return 0;
-  builder.CreateBr(CondBB); // backedge to check the condition
-  // while should return unit type
-  return Constant::getNullValue(Type::getInt32Ty(getGlobalContext()));
-}
-
-Type *LLVMGenerator::toLLVMType(MyType *t)
-{
-  if (t->isIntType())
+  // llvm semantic, if the symbol already exists, F will be automatically renamed
+  // and thus not equal to intended name
+  if (F->getName() != n->getName())
   {
-    return Type::getInt32Ty(getGlobalContext());
+    F->eraseFromParent();
+    F = module->getFunction(n->getName());
   }
-  else if (t->isRefType())
+  // function in our language takes only one argument
+  Function::arg_iterator AI = F->arg_begin();
+  AI->setName(n->getParamName());
+
+  BasicBlock *BB = BasicBlock::Create(getGlobalContext(), "entry", F);
+  builder.SetInsertPoint(BB);
+
+  // Store the supplied function argument to the allocate slot in stack
+  Value *allocaInst = builder.CreateAlloca(paramTy, nullptr, AI->getName());
+  ctxt.bind(n->getParamName(), allocaInst);
+  builder.CreateStore(AI, allocaInst);
+  ctxt.bind(n->getName(), F); // in case of recursive call
+  if (Value *retVal = n->getBodyExpAST()->accept(*this))
   {
-    return Type::getInt32PtrTy(getGlobalContext(), true);
+    builder.CreateRet(retVal);
+    verifyFunction(*F);
+    return F;
   }
-  else if (t->isTupleType())
-  {
-    std::vector<Type *> llvmTys;
-    MyTupleType *mt = dyn_cast<MyTupleType>(t);
-    for (const auto ty : mt->getTypes())
-    {
-      llvmTys.push_back(toLLVMType(ty));
-    }
-    return StructType::get(getGlobalContext(), llvmTys);
-  }
-  else
-  {
-    /* likely function type */
-    std::cerr << "You use type from MyType -> LLVM Type the wrong way !";
-    return Type::getVoidTy(getGlobalContext());
-  }
+  return NULL;
 }
