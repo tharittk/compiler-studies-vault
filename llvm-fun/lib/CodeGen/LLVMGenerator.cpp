@@ -345,21 +345,51 @@ Value *LLVMGenerator::visit(ProgramAST *n)
   return NULL;
 }
 
-Value *LLVMGenerator::visit(ProjExpAST *n)
-{
-  Value *targetTupleAlloca = n->getTargetTupleExpAST()->accept(*this);
-  // if (!tupleV) // must be tuple/vector, depending on how you represent it
-  //   reportErrorAndExit(n->getSrcLoc(), "ProjExp Error: target Value must be a vector");
-  Value *ptr = builder.CreateStructGEP(targetTupleAlloca, n->getIndex(), "loadPtr");
-  Value *loadInst = builder.CreateLoad(ptr, "projLoad");
-  return loadInst;
-}
-
 Value *LLVMGenerator::visit(SeqExpAST *n)
 {
   n->getExp1AST()->accept(*this);
   Value *v = n->getExp2AST()->accept(*this);
   return v;
+}
+
+// Value *LLVMGenerator::visit(ProjExpAST *n)
+// {
+//   Value *targetTupleAlloca = n->getTargetTupleExpAST()->accept(*this);
+//   Value *ptr = builder.CreateStructGEP(targetTupleAlloca, n->getIndex(), "loadPtr");
+//   Value *loadInst = builder.CreateLoad(ptr, "projLoad");
+//   return loadInst;
+// }
+Value *LLVMGenerator::visit(ProjExpAST *n)
+{
+  // codegen the target expression
+  Value *target = n->getTargetTupleExpAST()->accept(*this);
+  assert(target && "Proj target is null");
+
+  // If target is not a pointer (i.e., it's a struct value), create a tmp alloca and store it.
+  Value *targetPtr = nullptr;
+  if (target->getType()->isPointerTy())
+  {
+    targetPtr = target;
+  }
+  else
+  {
+    // way around, create tmp ptr
+    Function *F = builder.GetInsertBlock()->getParent();
+    IRBuilder<> tmpBuilder(&F->getEntryBlock(), F->getEntryBlock().begin());
+    AllocaInst *tmpAlloca = tmpBuilder.CreateAlloca(target->getType(), nullptr, "proj.tmp.alloca");
+    // store the struct value to the tmp alloca
+    builder.CreateStore(target, tmpAlloca);
+    targetPtr = tmpAlloca;
+  }
+
+  // sanity check: targetPtr must be a pointer-to-struct
+  assert(targetPtr->getType()->isPointerTy() &&
+         "targetPtr must be a pointer for CreateStructGEP");
+
+  // Create GEP and load the requested field
+  Value *fieldPtr = builder.CreateStructGEP(targetPtr, n->getIndex(), "proj.field.ptr");
+  Value *fieldLoad = builder.CreateLoad(fieldPtr, "proj.field.load");
+  return fieldLoad;
 }
 
 Value *LLVMGenerator::visit(TupleExpAST *n)
