@@ -43,6 +43,7 @@ namespace fun
 
   private:
     Type *toLLVMType(MyType *t);
+    Value *RegisterPrintIntIR();
     void reportErrorAndExit(SrcLoc srcLoc, std::string msg) const
     {
       std::cerr << srcFileName << ":" << srcLoc.line << ":" << srcLoc.col

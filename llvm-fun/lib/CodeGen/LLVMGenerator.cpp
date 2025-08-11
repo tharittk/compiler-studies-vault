@@ -301,13 +301,47 @@ Value *LLVMGenerator::visit(LetExpAST *n)
   return bodyV;
 }
 
+Value *LLVMGenerator::RegisterPrintIntIR()
+{
+  FunctionType *printfType = FunctionType::get(Type::getInt32Ty(getGlobalContext()),
+                                               /*char* */ {Type::getInt8PtrTy(getGlobalContext())},
+                                               /*varidic*/ true);
+
+  // to be resolved at run-time
+  auto *printfFunc = module->getOrInsertFunction("printf", printfType);
+
+  // custom printint type that calls C-printf internally
+  FunctionType *printIntType = FunctionType::get(Type::getInt32Ty(getGlobalContext()),
+                                                 /*char* */ {Type::getInt32Ty(getGlobalContext())},
+                                                 /*varidic*/ false);
+
+  Function *printIntFunc = Function::Create(printIntType, Function::ExternalLinkage, "printint", module);
+
+  Function::arg_iterator AI = printIntFunc->arg_begin();
+  AI->setName("printArg");
+
+  BasicBlock *BB = BasicBlock::Create(getGlobalContext(), "entry", printIntFunc);
+  builder.SetInsertPoint(BB);
+  // actual print
+  Value *fmt = builder.CreateGlobalStringPtr("LLVM IR Printint: %d \n");
+  Value *callRes = builder.CreateCall(printfFunc, {fmt, AI});
+  builder.CreateRet(callRes);
+  verifyFunction(*printIntFunc);
+  return printIntFunc;
+}
+
 Value *LLVMGenerator::visit(ProgramAST *n)
 {
   const std::map<std::string, FunDeclAST *> &funDecls = n->getFunDeclASTs();
+  // TODO: bind the printint here
+  Function *printIntF = dyn_cast<Function>(RegisterPrintIntIR());
+  ctxt.bind("printint", printIntF);
+
   for (auto it = funDecls.begin(); it != funDecls.end(); ++it)
   {
     it->second->accept(*this);
   }
+
   return NULL;
 }
 
@@ -402,8 +436,8 @@ Value *LLVMGenerator::visit(WhileExpAST *n)
 
   Function *F = builder.GetInsertBlock()->getParent();
   BasicBlock *CondBB = BasicBlock::Create(getGlobalContext(), "whileCond", F);
-  BasicBlock *LoopBB = BasicBlock::Create(getGlobalContext(), "loop");
-  BasicBlock *AfterLoopBB = BasicBlock::Create(getGlobalContext(), "afterLoop");
+  BasicBlock *LoopBB = BasicBlock::Create(getGlobalContext(), "loop", F);
+  BasicBlock *AfterLoopBB = BasicBlock::Create(getGlobalContext(), "afterLoop", F);
 
   // connect the (whatever it is) current block to the CondBB unconditionally
   builder.CreateBr(CondBB);
@@ -412,7 +446,7 @@ Value *LLVMGenerator::visit(WhileExpAST *n)
   Value *condV = n->getCondExpAST()->accept(*this);
   if (condV == 0)
     return 0;
-  condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "whileCond");
+  condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "whilePred");
   builder.CreateCondBr(condV, /*true*/ LoopBB, /*false*/ AfterLoopBB); // emit right after cmp
 
   builder.SetInsertPoint(LoopBB);
