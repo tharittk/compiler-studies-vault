@@ -379,15 +379,21 @@ Value *LLVMGenerator::visit(ProgramAST *n)
 Type *LLVMGenerator::toLLVMType(MyType *t)
 {
   if (t->isIntType())
+
   {
+
+    std::cout << "Int Type \n";
     return Type::getInt32Ty(getGlobalContext());
   }
   else if (t->isRefType())
   {
+    std::cout << "RefType \n";
     return Type::getInt32PtrTy(getGlobalContext(), true);
   }
   else if (t->isTupleType())
   {
+
+    std::cout << "Tuple Type\n";
     std::vector<Type *> llvmTys;
     MyTupleType *mt = dyn_cast<MyTupleType>(t);
     for (const auto ty : mt->getTypes())
@@ -477,11 +483,25 @@ Value *LLVMGenerator::visit(CallExpAST *n)
   if (!argV)
     reportErrorAndExit(n->getSrcLoc(), "CallExp Error: argument codegen produced null");
 
-  return builder.CreateCall(CalleeF, argV, "call");
+  // LLVM CreateCall needs a value and not the pointer to the value
+  // alloca instruction is a pointer to a value. You must load it first.
+  std::vector<Value *> args;
+  if (auto *inst = dyn_cast<AllocaInst>(argV))
+  {
+    Value *loadedArg = builder.CreateLoad(inst, "tuple.load");
+    args.push_back(loadedArg);
+  }
+  else
+  {
+    args.push_back(argV);
+  }
+  return builder.CreateCall(CalleeF, args, "call");
 }
 
 Value *LLVMGenerator::visit(FunDeclAST *n)
 {
+
+  std::cout << "FuncDecl: " << n->getName() << "\n";
   // register function to environment
   Type *retTy = toLLVMType(MyType::getType(n->getRetTypeAST()));
   Type *paramTy = toLLVMType(MyType::getType(n->getParamTypeAST()));
@@ -489,6 +509,7 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
   // build FunctionType with a 1-element parameter list
   std::vector<Type *> params;
   params.push_back(paramTy);
+
   FunctionType *FT = FunctionType::get(retTy, ArrayRef<Type *>(params), /*isVarArg=*/false);
 
   // register to the module for symbol look up
