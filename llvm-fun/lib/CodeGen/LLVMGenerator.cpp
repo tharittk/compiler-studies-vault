@@ -313,7 +313,9 @@ Value *LLVMGenerator::visit(WhileExpAST *n)
     return 0;
   builder.CreateBr(CondBB); // backedge to check the condition
   // while should return unit type
-  return Constant::getNullValue(Type::getInt32Ty(getGlobalContext()));
+  builder.SetInsertPoint(AfterLoopBB);
+  Value *nullV = Constant::getNullValue(Type::getInt32Ty(getGlobalContext()));
+  return nullV;
 }
 
 Value *LLVMGenerator::visit(LetExpAST *n)
@@ -352,7 +354,10 @@ Value *LLVMGenerator::RegisterPrintIntIR()
   BasicBlock *BB = BasicBlock::Create(getGlobalContext(), "entry", printIntFunc);
   builder.SetInsertPoint(BB);
   // actual print
-  Value *fmt = builder.CreateGlobalStringPtr("LLVM IR Printint: %d \n");
+  Value *fmt = builder.CreateGlobalStringPtr("LLVM IR Printint: %d \n", "fmtStr");
+  fmt = builder.CreateBitCast(fmt, Type::getInt8PtrTy(getGlobalContext()));
+
+  //  Value *fmt = builder.CreateGlobalStringPtr("LLVM IR Printint: %d \n");
   Value *callRes = builder.CreateCall(printfFunc, {fmt, AI});
   builder.CreateRet(callRes);
   verifyFunction(*printIntFunc);
@@ -379,21 +384,20 @@ Value *LLVMGenerator::visit(ProgramAST *n)
 Type *LLVMGenerator::toLLVMType(MyType *t)
 {
   if (t->isIntType())
-
   {
-
-    std::cout << "Int Type \n";
+    std::cerr << "Int Ty \n";
     return Type::getInt32Ty(getGlobalContext());
   }
   else if (t->isRefType())
   {
-    std::cout << "RefType \n";
-    return Type::getInt32PtrTy(getGlobalContext(), true);
+    std::cerr << "Ref Ty \n";
+    return Type::getInt32PtrTy(getGlobalContext(), /*AddrSpace*/ false);
   }
   else if (t->isTupleType())
   {
 
-    std::cout << "Tuple Type\n";
+    std::cerr << "Tuple Ty \n";
+
     std::vector<Type *> llvmTys;
     MyTupleType *mt = dyn_cast<MyTupleType>(t);
     for (const auto ty : mt->getTypes())
@@ -536,7 +540,15 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
   ctxt.bind(n->getName(), F); // in case of recursive call
   if (Value *retVal = n->getBodyExpAST()->accept(*this))
   {
-    builder.CreateRet(retVal);
+    if (auto *inst = dyn_cast<AllocaInst>(retVal))
+    {
+      Value *loadedRet = builder.CreateLoad(inst, "load.ret");
+      builder.CreateRet(loadedRet);
+    }
+    else
+    {
+      builder.CreateRet(retVal);
+    }
     verifyFunction(*F);
     return F;
   }
