@@ -104,13 +104,13 @@ Value *LLVMGenerator::visit(BinExpAST *n)
     builder.SetInsertPoint(rhsBlock);
     Value *condE2 = builder.CreateICmpNE(
         R, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "and.e2");
+    Value *condE2Zext = builder.CreateZExt(condE2, Type::getInt32Ty(getGlobalContext()));
     builder.CreateBr(mergeBlock);
-
     // Merge result
     builder.SetInsertPoint(mergeBlock);
     PHINode *phi = builder.CreatePHI(Type::getInt32Ty(getGlobalContext()), 2, "and.result");
     phi->addIncoming(ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), lhsBlock);
-    phi->addIncoming(builder.CreateZExt(condE2, Type::getInt32Ty(getGlobalContext())), rhsBlock);
+    phi->addIncoming(condE2Zext, rhsBlock);
     return phi;
   }
 
@@ -190,6 +190,7 @@ Value *LLVMGenerator::visit(UnExpAST *n)
     Function *F = builder.GetInsertBlock()->getParent();
     Value *expV = n->getExp1AST()->accept(*this);
     Value *heapInst = allocHeap(expV->getType(), &F->getEntryBlock(), "allocRefHeap");
+    builder.CreateStore(expV, heapInst);
     return heapInst;
   }
   case OpKind::OP_Get:
@@ -354,10 +355,7 @@ Value *LLVMGenerator::RegisterPrintIntIR()
   BasicBlock *BB = BasicBlock::Create(getGlobalContext(), "entry", printIntFunc);
   builder.SetInsertPoint(BB);
   // actual print
-  Value *fmt = builder.CreateGlobalStringPtr("LLVM IR Printint: %d \n", "fmtStr");
-  fmt = builder.CreateBitCast(fmt, Type::getInt8PtrTy(getGlobalContext()));
-
-  //  Value *fmt = builder.CreateGlobalStringPtr("LLVM IR Printint: %d \n");
+  Value *fmt = builder.CreateGlobalStringPtr("LLVM IR Printint: %d \n");
   Value *callRes = builder.CreateCall(printfFunc, {fmt, AI});
   builder.CreateRet(callRes);
   verifyFunction(*printIntFunc);
@@ -385,19 +383,17 @@ Type *LLVMGenerator::toLLVMType(MyType *t)
 {
   if (t->isIntType())
   {
-    std::cerr << "Int Ty \n";
+    // std::cerr << "Int Ty \n";
     return Type::getInt32Ty(getGlobalContext());
   }
   else if (t->isRefType())
   {
-    std::cerr << "Ref Ty \n";
+    // std::cerr << "Ref Ty \n";
     return Type::getInt32PtrTy(getGlobalContext(), /*AddrSpace*/ false);
   }
   else if (t->isTupleType())
   {
-
-    std::cerr << "Tuple Ty \n";
-
+    // std::cerr << "Tuple Ty \n";
     std::vector<Type *> llvmTys;
     MyTupleType *mt = dyn_cast<MyTupleType>(t);
     for (const auto ty : mt->getTypes())
@@ -505,7 +501,7 @@ Value *LLVMGenerator::visit(CallExpAST *n)
 Value *LLVMGenerator::visit(FunDeclAST *n)
 {
 
-  std::cout << "FuncDecl: " << n->getName() << "\n";
+  // std::cout << "FuncDecl: " << n->getName() << "\n";
   // register function to environment
   Type *retTy = toLLVMType(MyType::getType(n->getRetTypeAST()));
   Type *paramTy = toLLVMType(MyType::getType(n->getParamTypeAST()));
