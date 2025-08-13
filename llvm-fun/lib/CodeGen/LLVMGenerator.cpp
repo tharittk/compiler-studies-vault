@@ -58,11 +58,8 @@ Value *LLVMGenerator::allocHeap(Type *t, BasicBlock *bb, std::string name)
 //--------------------------------Binary Op---------------------------------------------
 Value *LLVMGenerator::visit(BinExpAST *n)
 {
-  auto leftExp = n->getExp1AST();
-  auto rightExp = n->getExp2AST();
-
-  Value *L = leftExp->accept(*this);
-  Value *R = rightExp->accept(*this);
+  Value *L = n->getExp1AST()->accept(*this);
+  Value *R = n->getExp2AST()->accept(*this);
   if (!L || !R)
     reportErrorAndExit(n->getSrcLoc(), "BinExp Error: L or R Value is null");
 
@@ -145,8 +142,6 @@ Value *LLVMGenerator::visit(BinExpAST *n)
 
   case OpKind::OP_Set:
   {
-    if (auto *allocInst = dyn_cast<AllocaInst>(L))
-      return builder.CreateStore(R, allocInst);
     return builder.CreateStore(R, L);
   }
   default:
@@ -180,7 +175,6 @@ Value *LLVMGenerator::visit(UnExpAST *n)
         v,
         ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0),
         "isZero");
-    // Zero-extend i1 to i32 (0 → 0, true → 1)
     Value *result = builder.CreateZExt(isZero, Type::getInt32Ty(getGlobalContext()), "not");
     return result;
   }
@@ -196,8 +190,7 @@ Value *LLVMGenerator::visit(UnExpAST *n)
   case OpKind::OP_Get:
   {
     Value *expV = n->getExp1AST()->accept(*this);
-    // you may do dyn_cast here
-    return builder.CreateLoad(expV, "loadGet");
+    return builder.CreateLoad(expV, "load.get");
   }
   default:
     reportErrorAndExit(n->getSrcLoc(), "UnExp Error: case does not match");
@@ -283,11 +276,10 @@ Value *LLVMGenerator::visit(IfExpAST *n)
   F->getBasicBlockList().push_back(MergeBB);
   builder.SetInsertPoint(MergeBB);
 
-  // TODO (tharitt): check the type incoming. Should it always be int ?
-  PHINode *PN = builder.CreatePHI(Type::getInt32Ty(getGlobalContext()), 2, "if.phi");
-  PN->addIncoming(thenV, ThenBB);
-  PN->addIncoming(elseV, ElseBB);
-  return PN;
+  PHINode *phi = builder.CreatePHI(Type::getInt32Ty(getGlobalContext()), 2, "if.phi");
+  phi->addIncoming(thenV, ThenBB);
+  phi->addIncoming(elseV, ElseBB);
+  return phi;
 }
 
 Value *LLVMGenerator::visit(WhileExpAST *n)
@@ -373,7 +365,6 @@ Value *LLVMGenerator::visit(ProgramAST *n)
   {
     it->second->accept(*this);
   }
-
   return NULL;
 }
 
@@ -402,10 +393,19 @@ Type *LLVMGenerator::toLLVMType(MyType *t)
     }
     return StructType::get(getGlobalContext(), llvmTys);
   }
+  else if (t->isFunType())
+  {
+    // std::cerr << "Hit return type f -> g\n";
+    MyFunType *mft = dyn_cast<MyFunType>(t);
+    FunctionType *FT = FunctionType::get(toLLVMType(mft->getRetType()), toLLVMType(mft->getParamType()), false);
+    PointerType *PFT = PointerType::getUnqual(FT);
+
+    // FunctionType *MainFT = FunctionType::get(PFT, {}, false);
+    return PFT; // TODO: this seems to work
+  }
   else
   {
-    /* likely function type */
-    std::cerr << "You use type from MyType -> LLVM Type the wrong way !";
+    // std::cerr << "Void Type returns \n";
     return Type::getVoidTy(getGlobalContext());
   }
 }
@@ -470,13 +470,30 @@ Value *LLVMGenerator::visit(CallExpAST *n)
 {
   // simple because our language supports only one variable
   Value *funV = n->getFunExpAST()->accept(*this);
-  if (!dyn_cast<Function>(funV))
-    reportErrorAndExit(n->getSrcLoc(), "CallExp Error: dyn_cast test of funV must be Function Type");
+  // TODO: If this is a ptr type, it should be dereferenced to get
+  // a function type
+  Value *Callee = nullptr;
+  if (Function *F = dyn_cast<Function>(funV))
+  {
+    Callee = F;
+  }
+  else if (funV->getType()->isPointerTy())
+  {
+    Callee = funV;
+  }
+  else
+  {
+    reportErrorAndExit(n->getSrcLoc(), "CallExp Error: dyn_cast or pointerTy fails");
+  }
 
+  if (!Callee)
+    reportErrorAndExit(n->getSrcLoc(), "CallExp Error: Callee not found");
   // lookup the actual function by name from the module
-  Function *CalleeF = module->getFunction(funV->getName());
-  if (!CalleeF)
-    reportErrorAndExit(n->getSrcLoc(), "CallExp Error: function not found in module");
+  // Function *CalleeF = module->getFunction(funV->getName());
+
+  // Function *CalleeF = module->getFunction(Callee->getName());
+  // if (!CalleeF)
+  //   reportErrorAndExit(n->getSrcLoc(), "CallExp Error: function not found in module");
 
   // single-argument language: ensure argument is generated
   Value *argV = n->getArgExpAST()->accept(*this);
@@ -495,7 +512,7 @@ Value *LLVMGenerator::visit(CallExpAST *n)
   {
     args.push_back(argV);
   }
-  return builder.CreateCall(CalleeF, args, "call");
+  return builder.CreateCall(Callee, args, "call");
 }
 
 Value *LLVMGenerator::visit(FunDeclAST *n)
@@ -513,8 +530,10 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
   FunctionType *FT = FunctionType::get(retTy, ArrayRef<Type *>(params), /*isVarArg=*/false);
 
   // register to the module for symbol look up
+  // std::cerr << "Register functions \n";
   Function *F = Function::Create(FT, Function::ExternalLinkage, n->getName(), module);
 
+  // std::cerr << "... register ok \n";
   // llvm semantic, if the symbol already exists, F will be automatically renamed
   // and thus not equal to intended name
   if (F->getName() != n->getName())
