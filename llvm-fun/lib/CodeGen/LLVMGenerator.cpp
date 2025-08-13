@@ -66,11 +66,21 @@ Value *LLVMGenerator::visit(BinExpAST *n)
   switch (n->getOp())
   {
   case OpKind::OP_Add:
+  {
     return builder.CreateAdd(L, R, "bin.add");
+  }
   case OpKind::OP_Sub:
+  {
     return builder.CreateSub(L, R, "bin.sub");
+  }
   case OpKind::OP_Mul:
+  {
     return builder.CreateMul(L, R, "bin.mul");
+  }
+  case OpKind::OP_Set:
+  {
+    return builder.CreateStore(R, L);
+  }
   case OpKind::OP_Equal:
   {
     Value *cond = builder.CreateICmp(CmpInst::ICMP_EQ, L, R, "bin.eq");
@@ -93,7 +103,7 @@ Value *LLVMGenerator::visit(BinExpAST *n)
 
     Value *condE1 = builder.CreateICmpNE(
         L, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "and.e1");
-    BasicBlock *lhsBlock = builder.GetInsertBlock(); // save predecessor before changing IP
+    BasicBlock *lhsBlock = builder.GetInsertBlock(); // save as a reference for phi node
 
     builder.CreateCondBr(condE1, rhsBlock, mergeBlock);
 
@@ -139,11 +149,6 @@ Value *LLVMGenerator::visit(BinExpAST *n)
     phi->addIncoming(condE2Zext, rhsBlock);
     return phi;
   }
-
-  case OpKind::OP_Set:
-  {
-    return builder.CreateStore(R, L);
-  }
   default:
   {
     reportErrorAndExit(n->getSrcLoc(), "BinExp Error: No case matches");
@@ -151,7 +156,6 @@ Value *LLVMGenerator::visit(BinExpAST *n)
   }
   }
 }
-
 //--------------------------------Unary Op---------------------------------------------
 Value *LLVMGenerator::visit(UnExpAST *n)
 {
@@ -159,7 +163,6 @@ Value *LLVMGenerator::visit(UnExpAST *n)
   {
   case OpKind::OP_UMinus:
   {
-    // apply minus to exp
     Value *v = n->getExp1AST()->accept(*this);
     ConstantInt *constInt = dyn_cast<ConstantInt>(v);
     if (!constInt)
@@ -193,8 +196,10 @@ Value *LLVMGenerator::visit(UnExpAST *n)
     return builder.CreateLoad(expV, "load.get");
   }
   default:
+  {
     reportErrorAndExit(n->getSrcLoc(), "UnExp Error: case does not match");
     return NULL;
+  }
   }
 }
 
@@ -235,17 +240,19 @@ Value *LLVMGenerator::visit(ConstrainExpAST *n)
 //--------------------------------Control Flow---------------------------------------------
 Value *LLVMGenerator::visit(IfExpAST *n)
 {
-  Value *condV = n->getCondExpAST()->accept(*this); // codegen
+  Value *condV = n->getCondExpAST()->accept(*this);
   if (condV == 0)
+  {
     return 0;
+  }
   // convert condition to a bool
   condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "if.cond");
   Function *F = builder.GetInsertBlock()->getParent();
 
   // automatically insert ThenBB to the end of the function F
   BasicBlock *ThenBB = BasicBlock::Create(getGlobalContext(), "if.then", F);
-  BasicBlock *ElseBB = BasicBlock::Create(getGlobalContext(), "if.else");
-  BasicBlock *MergeBB = BasicBlock::Create(getGlobalContext(), "if.merge");
+  BasicBlock *ElseBB = BasicBlock::Create(getGlobalContext(), "if.else", F);
+  BasicBlock *MergeBB = BasicBlock::Create(getGlobalContext(), "if.merge", F);
 
   // this is generated inside the cond block
   builder.CreateCondBr(condV, ThenBB, ElseBB);
@@ -254,7 +261,9 @@ Value *LLVMGenerator::visit(IfExpAST *n)
   builder.SetInsertPoint(ThenBB);
   Value *thenV = n->getThenExpAST()->accept(*this);
   if (thenV == 0)
+  {
     return 0;
+  }
   // unconditional branch then->merge. LLVM requires that every BB has a terminator (ret or br)
   builder.CreateBr(MergeBB);
   // codegen of 'then' may change the current block i.e., it recurses to somewhere else
@@ -262,18 +271,20 @@ Value *LLVMGenerator::visit(IfExpAST *n)
   ThenBB = builder.GetInsertBlock();
 
   // emit else block
-  F->getBasicBlockList().push_back(ElseBB); // then is added through the Create()
   builder.SetInsertPoint(ElseBB);
   Value *elseV;
   if (n->getElseExpAST() != nullptr)
+  {
     elseV = n->getElseExpAST()->accept(*this);
+  }
   else
+  {
     elseV = nullptr; // no codegen, empty block
+  }
   builder.CreateBr(MergeBB);
   // codegen of 'else' may change the current block again
   ElseBB = builder.GetInsertBlock();
 
-  F->getBasicBlockList().push_back(MergeBB);
   builder.SetInsertPoint(MergeBB);
 
   PHINode *phi = builder.CreatePHI(Type::getInt32Ty(getGlobalContext()), 2, "if.phi");
@@ -284,7 +295,6 @@ Value *LLVMGenerator::visit(IfExpAST *n)
 
 Value *LLVMGenerator::visit(WhileExpAST *n)
 {
-
   Function *F = builder.GetInsertBlock()->getParent();
   BasicBlock *CondBB = BasicBlock::Create(getGlobalContext(), "whileCond", F);
   BasicBlock *LoopBB = BasicBlock::Create(getGlobalContext(), "loop", F);
@@ -296,14 +306,18 @@ Value *LLVMGenerator::visit(WhileExpAST *n)
   builder.SetInsertPoint(CondBB);
   Value *condV = n->getCondExpAST()->accept(*this);
   if (condV == 0)
+  {
     return 0;
+  }
   condV = builder.CreateICmpNE(condV, ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0), "whilePred");
-  builder.CreateCondBr(condV, /*true*/ LoopBB, /*false*/ AfterLoopBB); // emit right after cmp
+  builder.CreateCondBr(condV, /*true*/ LoopBB, /*false*/ AfterLoopBB);
 
   builder.SetInsertPoint(LoopBB);
-  Value *bodyV = n->getBodyExpAST()->accept(*this); // codegen
+  Value *bodyV = n->getBodyExpAST()->accept(*this);
   if (bodyV == 0)
+  {
     return 0;
+  }
   builder.CreateBr(CondBB); // backedge to check the condition
   // while should return unit type
   builder.SetInsertPoint(AfterLoopBB);
@@ -374,17 +388,14 @@ Type *LLVMGenerator::toLLVMType(MyType *t)
 {
   if (t->isIntType())
   {
-    // std::cerr << "Int Ty \n";
     return Type::getInt32Ty(getGlobalContext());
   }
   else if (t->isRefType())
   {
-    // std::cerr << "Ref Ty \n";
     return Type::getInt32PtrTy(getGlobalContext(), /*AddrSpace*/ false);
   }
   else if (t->isTupleType())
   {
-    // std::cerr << "Tuple Ty \n";
     std::vector<Type *> llvmTys;
     MyTupleType *mt = dyn_cast<MyTupleType>(t);
     for (const auto ty : mt->getTypes())
@@ -395,24 +406,19 @@ Type *LLVMGenerator::toLLVMType(MyType *t)
   }
   else if (t->isFunType())
   {
-    // std::cerr << "Hit return type f -> g\n";
     MyFunType *mft = dyn_cast<MyFunType>(t);
     FunctionType *FT = FunctionType::get(toLLVMType(mft->getRetType()), toLLVMType(mft->getParamType()), false);
     PointerType *PFT = PointerType::getUnqual(FT);
-
-    // FunctionType *MainFT = FunctionType::get(PFT, {}, false);
-    return PFT; // TODO: this seems to work
+    return PFT;
   }
   else
   {
-    // std::cerr << "Void Type returns \n";
     return Type::getVoidTy(getGlobalContext());
   }
 }
 
 Value *LLVMGenerator::visit(ProjExpAST *n)
 {
-  // codegen the target expression
   Value *target = n->getTargetTupleExpAST()->accept(*this);
   assert(target && "Proj target is null");
 
@@ -488,13 +494,6 @@ Value *LLVMGenerator::visit(CallExpAST *n)
 
   if (!Callee)
     reportErrorAndExit(n->getSrcLoc(), "CallExp Error: Callee not found");
-  // lookup the actual function by name from the module
-  // Function *CalleeF = module->getFunction(funV->getName());
-
-  // Function *CalleeF = module->getFunction(Callee->getName());
-  // if (!CalleeF)
-  //   reportErrorAndExit(n->getSrcLoc(), "CallExp Error: function not found in module");
-
   // single-argument language: ensure argument is generated
   Value *argV = n->getArgExpAST()->accept(*this);
   if (!argV)
@@ -517,8 +516,6 @@ Value *LLVMGenerator::visit(CallExpAST *n)
 
 Value *LLVMGenerator::visit(FunDeclAST *n)
 {
-
-  // std::cout << "FuncDecl: " << n->getName() << "\n";
   // register function to environment
   Type *retTy = toLLVMType(MyType::getType(n->getRetTypeAST()));
   Type *paramTy = toLLVMType(MyType::getType(n->getParamTypeAST()));
@@ -530,10 +527,8 @@ Value *LLVMGenerator::visit(FunDeclAST *n)
   FunctionType *FT = FunctionType::get(retTy, ArrayRef<Type *>(params), /*isVarArg=*/false);
 
   // register to the module for symbol look up
-  // std::cerr << "Register functions \n";
   Function *F = Function::Create(FT, Function::ExternalLinkage, n->getName(), module);
 
-  // std::cerr << "... register ok \n";
   // llvm semantic, if the symbol already exists, F will be automatically renamed
   // and thus not equal to intended name
   if (F->getName() != n->getName())
