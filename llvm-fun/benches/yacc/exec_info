@@ -1,0 +1,15 @@
+SETUP = ln -sf ${BENCH_DIR}/input1/c-parse.y . ; \
+        ln -sf ${BENCH_DIR}/input2/awk.g.y . ; \
+        ln -sf ${BENCH_DIR}/input3/cexp.y . ; \
+        ln -sf ${BENCH_DIR}/input4/cpy.y . ; \
+        ln -sf ${BENCH_DIR}/input5/e.y . ; \
+        ln -sf ${BENCH_DIR}/input6/gram.y . ; \
+        ln -sf ${BENCH_DIR}/input7/parse.y . ; \
+        ln -sf ${BENCH_DIR}/input8/parser.y . ; \
+        ln -sf ${BENCH_DIR}/input9/pascal.y . ; \
+        ln -sf ${BENCH_DIR}/input10/picy.y .
+PROF_ARGS = e.y
+TEST_ARGS = c-parse.y
+PROF_CHECK = cat ${RESULT_FILE} y.tab.c | diff - ${BENCH_DIR}/output5/yacc.comb
+TEST_CHECK = cat ${RESULT_FILE} y.tab.c | diff - ${BENCH_DIR}/output1/yacc.comb
+CLEANUP = rm -f *.y y.tab.c

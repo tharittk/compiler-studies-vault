@@ -1,0 +1,1727 @@
+
+# line 2 "parse.y"
+/*--------------------------------------------------------------------------
+ *	parse.y
+ *------------------------------------------------------------------------*/
+#include <stdio.h>
+#include "impact0.h"
+#include "lex.h"
+#include "parse.h"
+#include "symbol.h"
+
+/*	IMPORT from lex.l	*/
+extern int expectTypeID;
+
+/*	Parser state.  */
+int pstate = ExitFunctDecl;
+
+/*	Minimum checking.	*/
+int structNest = 0; /* number of nested struct/union specification */ 
+int defNest = 0;   /* number of nested struct/union/enum/cast specification */
+int typedefNest[MAX_STRUCT_NEST];	/* number of nested typedef */
+int switchNest = 0;	/* detect case and default not in switch error */
+int loopNest = 0;	/* detect loop related errors */
+
+/*	Number of syntax errors detected.  */
+int parse_error = 0;	/* total number of syntax errors detected */
+
+/*	Macro definition for arm and disarm.  */
+#define ARM	(expectTypeID=1)
+#define DISARM	(expectTypeID=0)
+
+# define ID 257
+# define TYPE_ID 258
+# define CHAR_LIT 259
+# define SCALAR 260
+# define LSCALAR 261
+# define REAL 262
+# define STRING_LIT 263
+# define AUTO 264
+# define BREAK 265
+# define CASE 266
+# define CHAR 267
+# define CONST 268
+# define CONTINUE 269
+# define DEFAULT 270
+# define DO 271
+# define DOUBLE 272
+# define ELSE 273
+# define ENUM 274
+# define EXTERN 275
+# define FLOAT 276
+# define FOR 277
+# define GOTO 278
+# define IF 279
+# define INT 280
+# define LONG 281
+# define REGISTER 282
+# define RETURN 283
+# define SHORT 284
+# define SIGNED 285
+# define SIZEOF 286
+# define STATIC 287
+# define STRUCT 288
+# define SWITCH 289
+# define TYPEDEF 290
+# define UNION 291
+# define UNSIGNED 292
+# define VOID 293
+# define VOLATILE 294
+# define WHILE 295
+# define COMMA 296
+# define SEMI 297
+# define LPAR 298
+# define RPAR 299
+# define LBRACE 300
+# define RBRACE 301
+# define LSQR 302
+# define RSQR 303
+# define DOT 304
+# define ARROW 305
+# define PLUS 306
+# define MINUS 307
+# define STAR 308
+# define DIV 309
+# define MOD 310
+# define NOT 311
+# define TILDE 312
+# define AND 313
+# define OR 314
+# define XOR 315
+# define CONJUNCT 316
+# define DISJUNCT 317
+# define QUEST 318
+# define COLON 319
+# define RSHFT 320
+# define LSHFT 321
+# define REL_OP 322
+# define EQU_OP 323
+# define ASSIGN 324
+# define AUTOINC 325
+# define AUTODEC 326
+# define ASGNOP 327
+# define SHARP 328
+# define NOALIAS 329
+#define yyclearin yychar = -1
+#define yyerrok yyerrflag = 0
+extern int yychar;
+extern short yyerrflag;
+#ifndef YYMAXDEPTH
+#define YYMAXDEPTH 150
+#endif
+#ifndef YYSTYPE
+#define YYSTYPE int
+#endif
+YYSTYPE yylval, yyval;
+# define YYERRCODE 256
+
+# line 1180 "parse.y"
+
+yyerror() {
+}
+short yyexca[] ={
+-1, 1,
+	0, -1,
+	-2, 0,
+-1, 2,
+	0, 1,
+	-2, 68,
+-1, 8,
+	297, 8,
+	-2, 67,
+-1, 38,
+	300, 8,
+	-2, 9,
+-1, 39,
+	300, 8,
+	-2, 9,
+-1, 40,
+	300, 8,
+	-2, 9,
+-1, 46,
+	296, 143,
+	297, 143,
+	-2, 12,
+-1, 64,
+	298, 9,
+	-2, 131,
+-1, 76,
+	297, 8,
+	-2, 9,
+-1, 100,
+	319, 163,
+	-2, 166,
+-1, 124,
+	304, 9,
+	305, 9,
+	-2, 212,
+-1, 143,
+	297, 8,
+	-2, 9,
+-1, 144,
+	300, 8,
+	-2, 96,
+-1, 149,
+	300, 8,
+	-2, 105,
+-1, 153,
+	300, 8,
+	-2, 108,
+	};
+# define YYNPROD 238
+# define YYLAST 1039
+short yyact[]={
+
+ 106, 158, 110, 168, 362, 226, 327,  82, 157, 225,
+ 315,  45, 201,  46, 249, 203,  61, 100, 248, 140,
+ 137, 138, 139, 141, 211,  85, 101, 213, 364,  86,
+  91,  99, 223, 224, 214, 215, 383, 108,  88, 104,
+ 372, 271, 186,  87, 205, 204, 125, 184, 206, 105,
+  55,  57,  59, 208, 244, 102, 207,  92, 135,  62,
+ 107, 209, 160, 164, 243, 216, 217, 130, 128, 305,
+ 306, 131, 132, 129, 218, 219, 220, 300, 345, 390,
+ 300, 301, 192, 169, 301, 126, 127, 298, 173, 349,
+ 298, 377, 329, 343, 314, 181, 245, 344, 270, 379,
+ 324, 187, 160, 194, 259, 323, 148,  51, 100,  41,
+ 140, 137, 138, 139, 141,  16,  85, 101,  29,  20,
+  86,  91,  99,  31, 388,  42,  18,  30, 108,  88,
+ 104,  32,  34,  19,  87,  33,  35, 125,  17,  43,
+ 105,  23,  44,  36,  37,  22, 102, 241,  92, 135,
+  69, 107, 314, 297, 386, 238, 242, 313, 130, 128,
+ 160, 247, 131, 132, 129, 251, 192, 192, 254, 350,
+ 308, 378, 257, 376, 373, 252, 126, 127, 371, 338,
+  21, 337, 295, 267, 258, 331, 261, 255, 200, 199,
+ 198,  68, 195, 269, 394, 391, 354, 274, 330, 309,
+ 264,  65, 278, 279, 263, 273, 275, 276, 277, 260,
+ 197,   7, 179,  41, 178, 175, 162,  60, 382,  16,
+ 369, 192,  29,  20, 311,  70, 262,  31, 328,  42,
+  18,  30, 268, 246, 183,  32,  34,  19, 155,  33,
+  35, 272,  17,  43, 151,  23,  44,  36,  37,  22,
+ 146, 310,   6, 120, 118, 117, 114, 221,  71,  89,
+  50, 319, 116, 318, 119, 115,  47, 318,  74, 123,
+ 134,  41, 112,  73,  13, 122, 124,  16,  63, 133,
+  29,  20, 336, 212,  21,  31,  52,  42,  18,  30,
+ 113, 210, 339,  32,  34,  19, 111,  33,  35, 202,
+  17,  43, 109,  23,  44,  36,  37,  22, 136, 348,
+ 299, 296, 147, 253, 385, 355, 160, 358, 326, 353,
+  67, 325,  66,  64, 363, 160, 240,  49, 361, 154,
+ 360, 167, 150, 367, 153, 359,  40, 368, 149, 370,
+ 365, 171,  21, 174, 165,  39, 170, 166, 182, 145,
+ 144,  38, 375,  28,  27,  26,  25, 193,  24,  15,
+  14,  11,  96, 196, 103, 160, 384,  94,  93, 357,
+ 152, 189, 156, 381, 318, 389, 387, 356,  95,  90,
+ 318, 176,  41,  84, 160, 393, 363, 392,  16,  81,
+  80,  29,  20,  79,  97, 229,  31,  78,  42,  18,
+  30, 228, 351, 352,  32,  34,  19,  77,  33,  35,
+  72,  17,  43,  41,  23,  44,  36,  37,  22,  16,
+ 121,  98,  29,  20,  83, 380, 239,  31, 142,  42,
+  18,  30,   9,  53,  12,  32,  34,  19,  10,  33,
+  35,   5,  17,  43,   4,  23,  44,  36,  37,  22,
+   3,   2, 342,  21, 346,   1, 322,   0,   0,  41,
+   0,   0,   0,   0, 283,  16, 286, 287,  29,  20,
+ 290, 291, 285,  31, 284,  42,  18,  30, 281, 288,
+ 289,  32,  34,  19,  21,  33,  35, 307,  17,  43,
+  41,  23,  44,  36,  37,  22,  16, 282,   0,  29,
+  20,   0, 317,   0,  31,   0,  42,  18,  30,   0,
+   0,   0,  32,  34,  19, 334,  33,  35,   0,  17,
+  43,   0,  23,  44,  36,  37,  22,   0, 237, 161,
+  21, 140, 137, 138, 139, 141, 161,   0, 140, 137,
+ 138, 139, 141,   0,   0,   0,   0, 230, 231, 232,
+ 233, 234, 235, 236,   0, 312,   0,   0, 125,   0,
+ 316,  21,   0,   0, 321, 125,   0,   0,   0,   0,
+ 135,   0, 159, 366,   0,   0,   0, 135,   0, 130,
+ 128,   0, 374, 131, 132, 129, 130, 128,   0,   0,
+ 131, 132, 129,   0,   0,   0,   0, 126, 127, 280,
+   0,   0,   0,   0, 126, 127, 161,   0, 140, 137,
+ 138, 139, 141, 161,   0, 140, 137, 138, 139, 141,
+ 302, 304,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,  48,   0,   0, 125,   0,   0,   0, 292,
+ 293, 294, 125,   0,   0,   0,   0, 135, 250,   0,
+   0,   8, 347,   0, 135, 335, 130, 128,   0,   0,
+ 131, 132, 129, 130, 128,   0,   0, 131, 132, 129,
+   0,  54,  56,  58, 126, 127,   0,   0,   0,   0,
+   0, 126, 127, 161,   0, 140, 137, 138, 139, 141,
+ 161,   0, 140, 137, 138, 139, 141, 163,   0,   0,
+  76,   0, 143,   0,   0,   0,   0,   0,   0,   0,
+   0,   0, 125,   0,   0,   0, 340,   0,   0, 125,
+   0,  76,   0,   0, 135, 303,   0,   0,   0,   0,
+ 274, 135,   0, 130, 128,   0,   0, 131, 132, 129,
+ 130, 128,   0,   0, 131, 132, 129,  76,   0,   0,
+   0, 126, 127,   0,   0,   0,   0, 227, 126, 127,
+ 161,   0, 140, 137, 138, 139, 141,   0,   0,  75,
+   0,   0, 222,   0,   0,   0, 161,   0, 140, 137,
+ 138, 139, 141,   0,   0,   0,   0,   0,   0, 125,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0, 135,   0,   0,   0, 125, 256,   0,   0,   0,
+ 130, 128,   0,   0, 131, 132, 129, 135, 161, 159,
+ 140, 137, 138, 139, 141,   0, 130, 128, 126, 127,
+ 131, 132, 129,   0, 161,   0, 140, 137, 138, 139,
+ 141,   0,   0, 172, 126, 127,   0, 125,   0,   0,
+   0,   0,   0,   0, 177,   0,   0,   0, 180, 135,
+ 185,   0,   0, 125, 188, 190, 191,   0, 130, 128,
+   0,   0, 131, 132, 129, 135,   0,   0, 222,   0,
+   0,   0,   0, 320, 130, 128, 126, 127, 131, 132,
+ 129,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0, 126, 127,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0, 341,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+ 172,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0, 265,   0, 266,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0, 332, 333 };
+short yypact[]={
+
+-1000,-1000, -45,-1000,-1000,-1000,-1000,-1000,-1000,-1000,
+-193, 232,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,
+-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,
+-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,
+-1000,-1000,-1000,-1000,-1000, -80,-308,-1000,-107, -71,
+-1000,-149,-1000, 232,  -7,-194, -13,-194, -19,-194,
+-1000, 519, -81,-1000,-239,-107,-1000,-1000,-107,-1000,
+-1000,-1000,-149,-240,-1000,-1000,-1000,-1000,-1000,-1000,
+-1000,-1000, -82,-1000,-240, -83, -85, 561, -23,-272,
+-240,-277,-1000, 577,-240,-240,-240, -75,-149,-1000,
+-1000, 577,-106, -87,-108,-109,-1000,-1000,-110,-1000,
+-312,-273,-268,-258,-262,-252,-299,-295,-286,-241,
+-234,-1000,-1000, 232,-293, 577, 577, 577, 577, 577,
+ 577, 577, 577, 577,-1000,-1000,-1000,-1000,-1000,-1000,
+-1000,-1000,-1000,-1000,-1000,-1000,-1000, -24,-1000,-1000,
+-1000,-1000, 232,-1000,-1000,-1000, 232,-1000,-1000, 519,
+-1000,-1000,-1000,-111, 503,-1000,-115,-1000,-308,-197,
+-240,-1000,-1000, -88,-1000,-1000,-1000, -69,-1000,-1000,
+-1000, -93, -97,-1000,-240,-1000,-240,-116,-1000, -41,
+-1000,-1000, 577,-203,-278,-1000,-1000, 433, 577, 577,
+ 577, 577, 577,-1000, 577, 577, 577, 577, 577, 577,
+ 577,-1000, 577,-1000, 577, 577, 577, 577, 577, 577,
+ 577,-117,-218,-1000,-1000, 577, 426,-235,-1000, 232,
+-1000,-1000,-1000,-1000,-1000,-1000,-1000,-129, -98,-1000,
+ -72,-1000,-194,-144,-1000,-314,-1000,-194, 201,-1000,
+-1000,-194, 155,-196,-1000, -29,-1000,-211,-1000,-1000,
+-1000, -99,-113,-1000,-1000,-1000,-1000,-240,-240,-1000,
+-1000,-1000,-1000,-100, 356,-118,-120,-1000,-1000,-1000,
+ -75,-268,-258,-262,-252,-299,-295,-286,-241,-241,
+-234,-234,-1000,-1000,-1000, 577,-1000,-1000,-218,-205,
+-221, 349,-214,-1000,-130, -24, -24,-1000,-1000,-1000,
+-101,-1000, -24,-1000, -24, 577, 232,-1000,-1000,-1000,
+-291, 232,-1000,-1000, 272,-1000, -76,-1000,-1000,-1000,
+-1000, 577,-1000,-1000,-1000,-1000,-121,-1000,-1000,-279,
+-1000,-1000,-1000,-125, 279,-1000,-126,-1000,-212,-1000,
+-1000,-1000,-1000,-128,-1000,-1000,-202,-1000,-1000, 124,
+-1000, -78,-1000,-283, 577,  13,-1000,-1000,-145, -29,
+-175,-1000, 577,-1000,-1000,-224,-1000,-1000,-1000,-1000,
+-1000,-102,-291, 577,-1000,-1000,-1000,-1000,-103,-1000,
+-1000,-1000,-1000,-1000,-1000 };
+short yypgo[]={
+
+   0, 455, 451, 450, 444, 441,  11, 632, 438, 258,
+ 434, 433, 432,   3, 428, 648, 426, 424, 421, 410,
+ 273, 268, 769, 407, 397, 393, 390, 389,   7, 383,
+ 381, 259, 379,   1, 378, 371, 368, 367, 364, 363,
+ 241, 362, 266, 361, 274, 360, 359, 358, 356, 355,
+ 354, 353, 351, 350, 312,  64, 349,  54,  96, 345,
+ 338,  18, 336, 334, 332, 329,  14, 328,   4, 327,
+ 260, 326, 278, 323, 322, 321, 320, 318,   6,   8,
+ 313, 311, 153, 310, 308, 394,   0, 302,   2, 299,
+ 296, 272, 290, 256, 265, 262, 255, 291, 254, 283,
+ 264, 253, 420, 275, 269, 257, 279, 276, 270 };
+short yyr1[]={
+
+   0,   1,   2,   2,   3,   3,   3,   3,   6,   7,
+   5,   8,  10,  11,  11,  14,  14,  17,  18,   9,
+   9,   9,   9,  19,  19,  20,  20,  22,  22,  22,
+  22,  22,  23,  23,  23,  23,  23,  23,  23,  23,
+  23,  23,  23,  23,  32,  29,  30,  26,  26,  34,
+  35,  24,  36,  25,  37,  38,  38,  39,  39,  40,
+  40,  27,  41,   4,   4,  21,  21,  12,  12,  15,
+  43,  43,  44,  44,  45,  45,  45,  45,  45,  45,
+  45,  45,  46,  46,  46,  46,  47,  48,  48,  48,
+  48,  48,  48,  48,  48,  48,  49,  49,  49,  52,
+  53,  55,  55,  57,  57,  50,  50,  50,  50,  50,
+  50,  59,  62,  60,  63,  54,  61,  61,  66,  67,
+  67,  68,  68,  68,  42,  69,  69,  16,  71,  71,
+  13,  72,  72,  73,  73,  73,  73,  74,  74,  75,
+  75,  77,  77,  70,  70,  79,  79,  79,  80,  80,
+  81,  81,  82,  82,  82,  83,  83,  83,  83,  83,
+  83,  83,  76,  31,  51,  78,  84,  58,  56,  64,
+  65,  28,  33,  85,  85,  86,  87,  87,  87,  89,
+  88,  88,  90,  90,  91,  91,  92,  92,  93,  93,
+  94,  94,  95,  95,  97,  96,  96,  99,  98,  98,
+  98, 100, 100, 100, 101, 101, 101, 101, 102, 102,
+ 105, 104, 103, 103, 103, 103, 103, 103, 103, 103,
+ 103, 107, 107, 107, 107, 107, 107, 107, 107, 108,
+ 108, 108, 108, 108, 108, 108, 108, 106 };
+short yyr2[]={
+
+   0,   1,   2,   0,   1,   1,   1,   1,   0,   0,
+   5,   2,   2,   2,   0,   3,   4,   3,   1,   2,
+   1,   1,   0,   2,   1,   2,   1,   1,   1,   1,
+   1,   1,   2,   1,   2,   2,   2,   2,   3,   3,
+   3,   2,   3,   1,   3,   1,   6,   2,   4,   4,
+   1,   4,   2,   2,   2,   2,   3,   2,   3,   2,
+   3,   2,   4,   3,   4,   3,   4,   1,   0,   1,
+   1,   2,   1,   1,   1,   1,   1,   1,   1,   1,
+   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
+   1,   1,   1,   1,   1,   1,   3,   5,   7,   1,
+   1,   1,   3,   1,   3,   3,   5,   7,   3,   5,
+   7,   1,   1,   1,   1,   1,   3,   2,   5,   1,
+   3,   1,   2,   3,   1,   1,   3,   1,   1,   3,
+   2,   1,   2,   1,   6,   3,   4,   1,   3,   1,
+   0,   1,   3,   1,   3,   1,   3,   4,   1,   3,
+   1,   0,   2,   1,   1,   3,   3,   4,   2,   2,
+   3,   3,   1,   1,   1,   1,   1,   1,   1,   1,
+   1,   1,   1,   1,   3,   1,   1,   3,   3,   1,
+   1,   6,   1,   3,   1,   3,   1,   3,   1,   3,
+   1,   3,   1,   3,   1,   1,   3,   1,   1,   3,
+   3,   1,   3,   3,   1,   3,   3,   3,   1,   4,
+   3,   1,   1,   2,   2,   2,   2,   2,   2,   2,
+   2,   1,   2,   2,   4,   3,   4,   4,   4,   1,
+   1,   1,   1,   1,   1,   3,   5,   1 };
+short yychk[]={
+
+-1000,  -1,  -2,  -3,  -4,  -5, 297, 256, -15, -12,
+  -8, -43, -10, -44, -45, -46, 264, 287, 275, 282,
+ 268, 329, 294, 290, -47, -48, -49, -50, -51, 267,
+ 276, 272, 280, 284, 281, 285, 292, 293, -52, -59,
+ -62, 258, 274, 288, 291,  -6, -13, -42,  -7, -69,
+ -70, 300, -44, -11,  -7,  -6,  -7,  -6,  -7,  -6,
+ 297, 324,  -6, -72, -73, 308, -74, -76, 298, 257,
+ 296,  -9, -19, -20, -21, -22, -15, -23, -24, -25,
+ -26, -27, -28, -17, -29, 265, 269, 283, 278, -31,
+ -32, 270, 297, -36, -37, -34, -41, -85, -18, 271,
+ 257, 266, 295, -38, 279, 289, -86, 300, 277, -87,
+ -88, -90, -91, -92, -93, -94, -95, -96, -98,-100,
+-101,-102,-103,-104,-107, 286, 325, 326, 308, 313,
+ 307, 311, 312,-106,-108, 298, -84, 260, 261, 262,
+ 259, 263, -14, -15, -53, -56, 257, -54, 300, -60,
+ -64, 257, -54, -63, -65, 257, -54, -79, -33, 300,
+ -86, 257, 297,  -7, 302, -72, -72, -70, -13,  -6,
+ -20, -21, -22,  -6, -42, 297, -30, -22, 297, 297,
+ 297, -28, -31, 257, 319, -22, 319, -28, -22, -35,
+ -22, -22, 296,  -9, -33, 298, -39, 297, 298, 298,
+ 298, 324, -89, 327, 318, 317, 316, 314, 315, 313,
+ -97, 323, -99, 322, 320, 321, 306, 307, 308, 309,
+ 310,-105, -15, 325, 326, 302, 298,  -7,-103,-104,
+-102,-102,-102,-102,-102,-102,-102, -85,  -6, -16,
+ -71, -13,  -6, -55, -57, -58, 257,  -6, -61, -66,
+ -15,  -6, -61, -80, -79, 298, 303, -28, 299, 301,
+ 297,  -6, 295, 297, 297, -22, -22, 299, 273, -86,
+ 301, 319, -40, -28, 297, -28, -28, -28, -86, -86,
+ -85, -91, -92, -93, -94, -95, -96, -98,-100,-100,
+-101,-101,-102,-102,-102, 299, -81, -82, 308, -83,
+ 298, 302, -85, 299, -85, 304, 305,-105, 299, 297,
+  -6, 296, -54, 301, 296, 324, -54, 301, -66,  -6,
+  -7, -54, 301, 301, 296, -75, -77, -78, 257, 303,
+ 297, 298, -22, -22, -40, 299, -28, 299, 299,  -6,
+-102,  -7, -82, 298, 302, 299, -82, 303, -28, 303,
+ 299, -58, -58,  -6, 297, -13, -55, -57, -33, -61,
+  -6, -67, -68, -13, 319, -61, 301, -79,  -6, 296,
+ -28, 299, 319, 299, 303, -28, 299, 303, 299, 301,
+ 301,  -6, 296, 319, -33, 301, 299, -78, 299, -88,
+ 303, 297, -68, -33, 297 };
+short yydef[]={
+
+   3,  -2,  -2,   2,   4,   5,   6,   7,  -2,   9,
+   0,  69,  14,  70,  72,  73,  74,  75,  76,  77,
+  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,
+  88,  89,  90,  91,  92,  93,  94,  95,  -2,  -2,
+  -2, 164,  99, 111, 112,   0,  -2,   8,   0, 124,
+ 125,  22,  71,  11,   0,   0,   0,   0,   0,   0,
+  63,   0,   0, 130,  -2,   0, 133, 137,   0, 162,
+   9,   8,  20,  21,  24,  26,  -2,  27,  28,  29,
+  30,  31,   0,  33,   0,   0,   0,   0,   0,   0,
+   0,   0,  43,   0,   0,   0,   0, 171,  22,  45,
+  -2,   0,   0,   0,   0,   0, 173,  18,   0, 175,
+ 176, 180, 182, 184, 186, 188, 190, 192, 195, 198,
+ 201, 204, 208,   0,  -2,   0,   0,   0,   0,   0,
+   0,   0,   0, 211, 221, 237, 229, 230, 231, 232,
+ 233, 234,  13,  -2,  -2, 100, 168,   0, 115,  -2,
+ 113, 169,   0,  -2, 114, 170,   0, 144, 145,   0,
+ 172, 166,  64,   0,   0, 132,   0, 126, 143,   0,
+  19,  23,  25,   0,   8,  32,  34,   0,  35,  36,
+  37,   0,   0, 163,   0,  41,   0,   0,  53,  47,
+  50,  61,   0,   0,   0,  52,  54,   0,   0,   0,
+  55,   0,   0, 179,   0,   0,   0,   0,   0,   0,
+   0, 194,   0, 197,   0,   0,   0,   0,   0,   0,
+   0,   0, 151, 222, 223,   0,   0,   0, 213,   0,
+ 214, 215, 216, 217, 218, 219, 220,   0,   0,   8,
+ 127, 128,   0,   0, 101, 103, 167,   0,   0,   8,
+   9,   0,   0,   0, 148, 140, 135,   0, 138,  10,
+  65,   0,   0,  38,  39,  40,  42,   0,   0, 174,
+  17,  44,  57,   0,   0,   0,   0,  56, 177, 178,
+   8, 183, 185, 187, 189, 191, 193, 196, 199, 200,
+ 202, 203, 205, 206, 207,   0,   9, 150, 153, 154,
+   0,   0,   0, 225,   0,   0,   0,   8, 235,  15,
+   0,   9,   0,  97,   0,   0,   0, 106,   8, 117,
+   9,   0, 109, 146,   0,   8, 139, 141, 165, 136,
+  66,   0,  51,  48,  58,  59,   0,  49,  62,   0,
+ 209, 210, 152,   0,   0, 158,   0, 159,   0, 224,
+ 226, 227, 228,   0,  16, 129,   0, 102, 104,   0,
+ 116,   8, 119, 121,   0,   0, 147, 149,   0,   0,
+   0,  60,   0, 155, 156,   0, 161, 160, 236,  98,
+ 107,   0,   9,   0, 122, 110, 134, 142,   0, 181,
+ 157, 118, 120, 123,  46 };
+#ifndef lint
+static	char yaccpar_sccsid[] = "@(#)yaccpar 1.1 86/09/25 SMI"; /* from UCB 4.1 83/02/11 */
+#endif
+
+#
+# define YYFLAG -1000
+# define YYERROR goto yyerrlab
+# define YYACCEPT return(0)
+# define YYABORT return(1)
+
+/*	parser for yacc output	*/
+
+#ifdef YYDEBUG
+int yydebug = 0; /* 1 for debugging */
+#endif
+YYSTYPE yyv[YYMAXDEPTH]; /* where the values are stored */
+int yychar = -1; /* current input token number */
+int yynerrs = 0;  /* number of errors */
+short yyerrflag = 0;  /* error recovery flag */
+
+yyparse() {
+
+	short yys[YYMAXDEPTH];
+	short yyj, yym;
+	register YYSTYPE *yypvt;
+	register short yystate, *yyps, yyn;
+	register YYSTYPE *yypv;
+	register short *yyxi;
+
+	yystate = 0;
+	yychar = -1;
+	yynerrs = 0;
+	yyerrflag = 0;
+	yyps= &yys[-1];
+	yypv= &yyv[-1];
+
+ yystack:    /* put a state and value onto the stack */
+
+#ifdef YYDEBUG
+	if( yydebug  ) printf( "state %d, char 0%o\n", yystate, yychar );
+#endif
+		if( ++yyps>= &yys[YYMAXDEPTH] ) { yyerror( "yacc stack overflow" ); return(1); }
+		*yyps = yystate;
+		++yypv;
+		*yypv = yyval;
+
+ yynewstate:
+
+	yyn = yypact[yystate];
+
+	if( yyn<= YYFLAG ) goto yydefault; /* simple state */
+
+	if( yychar<0 ) if( (yychar=yylex())<0 ) yychar=0;
+	if( (yyn += yychar)<0 || yyn >= YYLAST ) goto yydefault;
+
+	if( yychk[ yyn=yyact[ yyn ] ] == yychar ){ /* valid shift */
+		yychar = -1;
+		yyval = yylval;
+		yystate = yyn;
+		if( yyerrflag > 0 ) --yyerrflag;
+		goto yystack;
+		}
+
+ yydefault:
+	/* default state action */
+
+	if( (yyn=yydef[yystate]) == -2 ) {
+		if( yychar<0 ) if( (yychar=yylex())<0 ) yychar = 0;
+		/* look through exception table */
+
+		for( yyxi=yyexca; (*yyxi!= (-1)) || (yyxi[1]!=yystate) ; yyxi += 2 ) ; /* VOID */
+
+		while( *(yyxi+=2) >= 0 ){
+			if( *yyxi == yychar ) break;
+			}
+		if( (yyn = yyxi[1]) < 0 ) return(0);   /* accept */
+		}
+
+	if( yyn == 0 ){ /* error */
+		/* error ... attempt to resume parsing */
+
+		switch( yyerrflag ){
+
+		case 0:   /* brand new error */
+
+			yyerror( "syntax error" );
+		yyerrlab:
+			++yynerrs;
+
+		case 1:
+		case 2: /* incompletely recovered error ... try again */
+
+			yyerrflag = 3;
+
+			/* find a state where "error" is a legal shift action */
+
+			while ( yyps >= yys ) {
+			   yyn = yypact[*yyps] + YYERRCODE;
+			   if( yyn>= 0 && yyn < YYLAST && yychk[yyact[yyn]] == YYERRCODE ){
+			      yystate = yyact[yyn];  /* simulate a shift of "error" */
+			      goto yystack;
+			      }
+			   yyn = yypact[*yyps];
+
+			   /* the current yyps has no shift onn "error", pop stack */
+
+#ifdef YYDEBUG
+			   if( yydebug ) printf( "error recovery pops state %d, uncovers %d\n", *yyps, yyps[-1] );
+#endif
+			   --yyps;
+			   --yypv;
+			   }
+
+			/* there is no state on the stack with an error shift ... abort */
+
+	yyabort:
+			return(1);
+
+
+		case 3:  /* no shift yet; clobber input char */
+
+#ifdef YYDEBUG
+			if( yydebug ) printf( "error recovery discards char %d\n", yychar );
+#endif
+
+			if( yychar == 0 ) goto yyabort; /* don't discard EOF, quit */
+			yychar = -1;
+			goto yynewstate;   /* try again in the same state */
+
+			}
+
+		}
+
+	/* reduction by production yyn */
+
+#ifdef YYDEBUG
+		if( yydebug ) printf("reduce %d\n",yyn);
+#endif
+		yyps -= yyr2[yyn];
+		yypvt = yypv;
+		yypv -= yyr2[yyn];
+		yyval = yypv[1];
+		yym=yyn;
+			/* consult goto table to find next state */
+		yyn = yyr1[yyn];
+		yyj = yypgo[yyn] + *yyps + 1;
+		if( yyj>=YYLAST || yychk[ yystate = yyact[yyj] ] != -yyn ) yystate = yyact[yypgo[yyn]];
+		switch(yym){
+			
+case 1:
+# line 50 "parse.y"
+{ KillScopeAbove(0); } break;
+case 2:
+# line 53 "parse.y"
+{ ARM; } break;
+case 3:
+# line 55 "parse.y"
+{ ARM; } break;
+case 4:
+# line 63 "parse.y"
+{ 	
+	Process_Parse_Tree(yypvt[-0]); 
+	yyval = nil;
+    } break;
+case 5:
+# line 68 "parse.y"
+{ 
+	Process_Parse_Tree(yypvt[-0]); 
+	KillScopeAbove(1);
+	yyval = nil;
+    } break;
+case 6:
+# line 74 "parse.y"
+{
+	Process_Parse_Tree(nil);
+	yyval = nil;
+    } break;
+case 7:
+# line 79 "parse.y"
+{
+	parseError("unrecoverable syntax error");
+	print_tree(yypvt[-1], 2, 'E');
+	exit(0);
+    } break;
+case 8:
+# line 89 "parse.y"
+{ ARM; yyval = nil; } break;
+case 9:
+# line 92 "parse.y"
+{ DISARM; yyval = nil; } break;
+case 10:
+# line 100 "parse.y"
+{ 
+	pstate = ExitFunctDecl;
+	DoScopeOut();
+	yyval = MakeNtNode(T_functDecl, "functDecl", yypvt[-4], yypvt[-2], nil); 
+    } break;
+case 11:
+# line 111 "parse.y"
+{
+	DefineParamID();
+	yyval = Concat(yypvt[-1], yypvt[-0]);
+    } break;
+case 12:
+# line 121 "parse.y"
+{ 
+	/* 	Entering function body definition.	*/
+	pstate = EnterFunctDecl;
+	/*	Create a new scope.	*/
+	DoScopeIn();
+	yyval = MakeNtNode(T_functHead, "functHead", yypvt[-1], yypvt[-0], nil); 
+    } break;
+case 13:
+# line 134 "parse.y"
+{ ARM; yyval = Concat(yypvt[-1], yypvt[-0]); } break;
+case 14:
+# line 136 "parse.y"
+{ ARM; yyval = nil; } break;
+case 15:
+# line 139 "parse.y"
+{ 
+	/*	Reset the typedefNest counter for the current level.  */
+	typedefNest[defNest] = 0;
+	yyval = MakeNtNode(T_paramDataDecl, "paramDataDecl", yypvt[-2], nil, nil); 
+    } break;
+case 16:
+# line 145 "parse.y"
+{ 
+	/*	Reset the typedefNest counter for the current level.  */
+	typedefNest[defNest] = 0;
+	yyval = MakeNtNode(T_paramDataDecl, "paramDataDecl", yypvt[-3], yypvt[-2], nil); 
+    } break;
+case 17:
+# line 159 "parse.y"
+{ 
+	DoScopeOut(); 		/* return to the previous scope */
+	DISARM;			/* postcondition : disarmed */
+	yyval = MakeNtNode(T_compoundStmt, "compoundStmt", yypvt[-1], nil, nil); 
+    } break;
+case 18:
+# line 169 "parse.y"
+{ 
+	DoScopeIn(); 
+	ARM;
+	yyval = nil;
+    } break;
+case 19:
+# line 179 "parse.y"
+{ ARM; yyval = Concat(yypvt[-1], yypvt[-0]); } break;
+case 20:
+# line 181 "parse.y"
+{ ARM; yyval = yypvt[-0]; } break;
+case 21:
+# line 183 "parse.y"
+{ ARM; yyval = yypvt[-0]; } break;
+case 22:
+# line 185 "parse.y"
+{ ARM; yyval = nil; } break;
+case 23:
+# line 188 "parse.y"
+{ ARM; yyval = Concat(yypvt[-1], yypvt[-0]); } break;
+case 24:
+# line 190 "parse.y"
+{ ARM; yyval = yypvt[-0]; } break;
+case 25:
+# line 193 "parse.y"
+{ ARM; yyval = Concat(yypvt[-1], yypvt[-0]); } break;
+case 26:
+# line 195 "parse.y"
+{ ARM; yyval = yypvt[-0]; } break;
+case 27:
+# line 211 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 28:
+# line 213 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 29:
+# line 215 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 30:
+# line 217 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 31:
+# line 219 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 32:
+# line 228 "parse.y"
+{ yyval = yypvt[-1]; } break;
+case 33:
+# line 230 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 34:
+# line 232 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 35:
+# line 234 "parse.y"
+{ 
+	if (loopNest == 0 && switchNest == 0) {
+		parseError("break statement not inside a loop or switch");
+	}
+	yyval = MakeNtNode(T_break, "break", nil, nil, nil); 
+    } break;
+case 36:
+# line 241 "parse.y"
+{ 	
+	if (loopNest == 0) {
+		parseError("continue statement not inside a loop");
+	}
+	yyval = MakeNtNode(T_continue, "continue", nil, nil, nil); 
+    } break;
+case 37:
+# line 248 "parse.y"
+{ yyval = MakeNtNode(T_return, "return", nil, nil, nil); } break;
+case 38:
+# line 250 "parse.y"
+{ yyval = MakeNtNode(T_return, "return", yypvt[-1], nil, nil); } break;
+case 39:
+# line 252 "parse.y"
+{ yyval = MakeNtNode(T_goto, "goto", yypvt[-1], nil, nil); } break;
+case 40:
+# line 254 "parse.y"
+{ yyval = Concat(MakeNtNode(T_label, "label", yypvt[-2], nil, nil), yypvt[-0]); } break;
+case 41:
+# line 256 "parse.y"
+{ 
+	/*
+	 *	This rule will overflow when there is a long chain
+	 *	of case : case : ... statements.
+	 */
+	yyval = InsertRightMost(yypvt[-1], yypvt[-0]);
+    } break;
+case 42:
+# line 264 "parse.y"
+{ 
+	if (switchNest == 0) {
+		parseError("default not in switch statement");
+	}
+	yyval = MakeNtNode(T_default, "default", nil, yypvt[-0], nil); 
+    } break;
+case 43:
+# line 271 "parse.y"
+{ 
+	/* 
+	 *	We need to generate a noop node for this, because we
+	 *	may have a label in front of this instruction, which
+	 *	may be branched to later in the program.
+	 */
+	yyval = MakeNtNode(T_noop, "noop", nil, nil, nil); 
+    } break;
+case 44:
+# line 281 "parse.y"
+{
+	if (switchNest == 0) {
+		parseError("case not in switch statement");
+	}
+	yyval = MakeNtNode(T_case, "case", yypvt[-1], nil, nil); 
+    } break;
+case 45:
+# line 289 "parse.y"
+{ loopNest++; yyval = nil; } break;
+case 46:
+# line 292 "parse.y"
+{ 
+	loopNest--;
+	yyval = MakeNtNode(T_do_while, "do_while", yypvt[-5], yypvt[-2], nil); 
+    } break;
+case 47:
+# line 302 "parse.y"
+{ yyval = MakeNtNode(T_if, "if", yypvt[-1], yypvt[-0], nil); } break;
+case 48:
+# line 304 "parse.y"
+{ yyval = MakeNtNode(T_if, "if", yypvt[-3], 
+		MakeNtNode(T_else, "else", yypvt[-2], yypvt[-0], nil), nil); 
+    } break;
+case 49:
+# line 309 "parse.y"
+{	yyval = yypvt[-1]; } break;
+case 50:
+# line 312 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 51:
+# line 315 "parse.y"
+{	
+	loopNest--;
+	yyval = MakeNtNode(T_while, "while", yypvt[-2], yypvt[-0], nil); 
+    } break;
+case 52:
+# line 321 "parse.y"
+{	
+	loopNest++;
+	yyval = nil;
+    } break;
+case 53:
+# line 327 "parse.y"
+{
+	loopNest--;
+	yyval = MakeNtNode(T_for, "for", yypvt[-1], yypvt[-0], nil); 
+    } break;
+case 54:
+# line 333 "parse.y"
+{ yyval = MakeNtNode(T_for_init, "for_init", yypvt[-1], yypvt[-0], nil); } break;
+case 55:
+# line 336 "parse.y"
+{ loopNest++; yyval = nil; } break;
+case 56:
+# line 338 "parse.y"
+{ loopNest++; yyval = yypvt[-0]; } break;
+case 57:
+# line 341 "parse.y"
+{ yyval = MakeNtNode(T_for_enable, "for_enable", nil, yypvt[-0], nil); } break;
+case 58:
+# line 343 "parse.y"
+{ yyval = MakeNtNode(T_for_enable, "for_enable", yypvt[-1], yypvt[-0], nil); } break;
+case 59:
+# line 346 "parse.y"
+{ yyval = MakeNtNode(T_for_iterate, "for_iterate", nil, nil, nil); } break;
+case 60:
+# line 348 "parse.y"
+{ yyval = MakeNtNode(T_for_iterate, "for_iterate", yypvt[-1], nil, nil); } break;
+case 61:
+# line 351 "parse.y"
+{ switchNest--;
+	yyval = MakeNtNode(T_switch, "switch", yypvt[-1], yypvt[-0], nil); 
+    } break;
+case 62:
+# line 356 "parse.y"
+{ switchNest++; yyval = yypvt[-1]; } break;
+case 63:
+# line 362 "parse.y"
+{
+	/*	Reset the typedefNest counter for the current level.  */
+	typedefNest[defNest] = 0;
+	yyval = MakeNtNode(T_globalDataDecl, "globalDataDecl", yypvt[-2], nil, nil); 
+    } break;
+case 64:
+# line 368 "parse.y"
+{ 
+	/*	Reset the typedefNest counter for the current level.  */
+	typedefNest[defNest] = 0;
+	yyval = MakeNtNode(T_globalDataDecl, "globalDataDecl", yypvt[-3], yypvt[-2], nil); 
+    } break;
+case 65:
+# line 375 "parse.y"
+{ 
+	/*	Reset the typedefNest counter for the current level.  */
+	typedefNest[defNest] = 0;
+	yyval = MakeNtNode(T_localDataDecl, "localDataDecl", yypvt[-2], nil, nil); 
+    } break;
+case 66:
+# line 381 "parse.y"
+{ 
+	/*	Reset the typedefNest counter for the current level.  */
+	typedefNest[defNest] = 0;
+	yyval = MakeNtNode(T_localDataDecl, "localDataDecl", yypvt[-3], yypvt[-2], nil); 
+    } break;
+case 67:
+# line 393 "parse.y"
+{	/* We must enter optDeclSpec already in armed state.  */
+	yyval = yypvt[-0]; 
+    } break;
+case 68:
+# line 397 "parse.y"
+{	DISARM; yyval = nil; } break;
+case 69:
+# line 404 "parse.y"
+{	/* We must enter declSpec already in armed state.  */
+	DISARM; yyval = yypvt[-0]; 
+    } break;
+case 70:
+# line 409 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 71:
+# line 411 "parse.y"
+{	yyval = Concat(yypvt[-1], yypvt[-0]); } break;
+case 72:
+# line 414 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 73:
+# line 416 "parse.y"
+{	/*	After a type is given, we no longer expect an
+	 *	user defined type. Be careful that we need to
+	 *	arm before returning to the topDecl level.
+	 */
+	expectTypeID = 0;
+	yyval = yypvt[-0]; 
+    } break;
+case 74:
+# line 425 "parse.y"
+{ yyval = MakeNtNode(T_auto, "auto", nil, nil, nil); } break;
+case 75:
+# line 427 "parse.y"
+{ /*	static is not allowed in struct/union definition.	*/
+	if (structNest > 0)
+		parseError("static class is not allowed in struct/union");
+	yyval = MakeNtNode(T_static, "static", nil, nil, nil); 
+    } break;
+case 76:
+# line 433 "parse.y"
+{ /*	extern is not allowed in struct/union definition.	*/
+	if (structNest > 0)
+		parseError("extern class is not allowed in struct/union");
+	yyval = MakeNtNode(T_extern, "extern", nil, nil, nil); 
+    } break;
+case 77:
+# line 439 "parse.y"
+{ /*	register is not allowed in struct/union definition.	*/
+	if (structNest > 0)
+		parseError("register class is not allowed in struct/union");
+	yyval = MakeNtNode(T_register, "register", nil, nil, nil); 
+    } break;
+case 78:
+# line 445 "parse.y"
+{ /*	const is not allowed in struct/union definition.	*/
+	if (structNest > 0)
+		parseError("const qualifier is not allowed in struct/union");
+	yyval = MakeNtNode(T_const, "const", nil, nil, nil); 
+    } break;
+case 79:
+# line 451 "parse.y"
+{ /*	noalias is not allowed in struct/union definition.	*/
+	if (structNest > 0)
+		parseError("noalias qualifier is not allowed in struct/union");
+	yyval = MakeNtNode(T_noalias, "noalias", nil, nil, nil); 
+    } break;
+case 80:
+# line 457 "parse.y"
+{ /*	volatile is not allowed in struct/union definition.	*/
+	if (structNest > 0)
+		parseError("volatile qualifier is not allowed in struct/union");
+	yyval = MakeNtNode(T_volatile, "volatile", nil, nil, nil); 
+    } break;
+case 81:
+# line 463 "parse.y"
+{ /*	typedef is not allowed in struct/union definition.	*/
+	if (structNest > 0)
+		parseError("typedef class is not allowed in struct/union");
+	/*
+	 *	Found another typedef in the current decl.
+	 */
+	typedefNest[defNest]++;
+	if (typedefNest[defNest] > 1) {
+		parseError("too many occurances of typedef");
+	}
+	yyval = MakeNtNode(T_typedef, "typedef", nil, nil, nil); 
+    } break;
+case 82:
+# line 477 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 83:
+# line 479 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 84:
+# line 481 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 85:
+# line 483 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 86:
+# line 486 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 87:
+# line 489 "parse.y"
+{ yyval = MakeNtNode(T_char, "char", nil, nil, nil); } break;
+case 88:
+# line 491 "parse.y"
+{ yyval = MakeNtNode(T_float, "float", nil, nil, nil); } break;
+case 89:
+# line 493 "parse.y"
+{ yyval = MakeNtNode(T_double, "double", nil, nil, nil); } break;
+case 90:
+# line 495 "parse.y"
+{ yyval = MakeNtNode(T_int, "int", nil, nil, nil); } break;
+case 91:
+# line 497 "parse.y"
+{ yyval = MakeNtNode(T_short, "short", nil, nil, nil); } break;
+case 92:
+# line 499 "parse.y"
+{ yyval = MakeNtNode(T_long, "long", nil, nil, nil); } break;
+case 93:
+# line 501 "parse.y"
+{ yyval = MakeNtNode(T_signed, "signed", nil, nil, nil); } break;
+case 94:
+# line 503 "parse.y"
+{ yyval = MakeNtNode(T_unsigned, "unsigned", nil, nil, nil); } break;
+case 95:
+# line 505 "parse.y"
+{ yyval = MakeNtNode(T_void, "void", nil, nil, nil); } break;
+case 96:
+# line 508 "parse.y"
+{ /*	struct/union/enum checking	*/
+	structNest--;
+	defNest--;
+	yyval = MakeNtNode(T_enum, "enum", yypvt[-0], nil, nil); 
+    } break;
+case 97:
+# line 514 "parse.y"
+{ /*	struct/union/enum checking	*/
+	structNest--;
+	defNest--;
+	/*	variable/typeid scope management	*/
+	DoScopeOut();
+	yyval = MakeNtNode(T_enum, "enum", nil, yypvt[-1], nil); 
+    } break;
+case 98:
+# line 522 "parse.y"
+{ /*	struct/union/enum checking	*/
+	structNest--;
+	defNest--;
+	/*	variable/typeid scope management	*/
+	DoScopeOut();
+	yyval = MakeNtNode(T_enum, "enum", yypvt[-4], yypvt[-1], nil); 
+    } break;
+case 99:
+# line 531 "parse.y"
+{
+	DISARM;		/* for enum tag */
+	/*
+	 *	Set up checking information for a new level
+	 *	of struct/union/enum definition.
+	 */
+	structNest++;
+	defNest++;
+	if (defNest >= MAX_STRUCT_NEST) {
+		parseError("too many levels of struct/union/enum definition");
+		exit(0);
+	}
+	/*	Reset the type declaration.	*/
+	typedefNest[defNest] = 0;
+	yyval = nil;
+    } break;
+case 100:
+# line 549 "parse.y"
+{ ARM; yyval = yypvt[-0]; } break;
+case 101:
+# line 552 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 102:
+# line 554 "parse.y"
+{ yyval = Concat(yypvt[-2], yypvt[-0]); } break;
+case 103:
+# line 557 "parse.y"
+{ yyval = MakeNtNode(T_enumItem, "enumItem", yypvt[-0], nil, nil); } break;
+case 104:
+# line 559 "parse.y"
+{ yyval = MakeNtNode(T_enumItem, "enumItem", yypvt[-2], yypvt[-0], nil); } break;
+case 105:
+# line 562 "parse.y"
+{ /*	struct/union checking	*/
+	structNest--;
+	defNest--;
+	yyval = MakeNtNode(T_struct, "struct", yypvt[-0], nil, nil); 
+    } break;
+case 106:
+# line 568 "parse.y"
+{ /*	struct/union checking	*/
+	structNest--;
+	defNest--;
+	/*	variable/typeid scope management	*/
+	DoScopeOut();
+	yyval = MakeNtNode(T_struct, "struct", nil, yypvt[-1], nil); 
+    } break;
+case 107:
+# line 576 "parse.y"
+{ /*	struct/union checking	*/
+	structNest--;
+	defNest--;
+	/*	variable/typeid scope management	*/
+	DoScopeOut();
+	yyval = MakeNtNode(T_struct, "struct", yypvt[-4], yypvt[-1], nil); 
+    } break;
+case 108:
+# line 584 "parse.y"
+{ /*	struct/union checking	*/
+	structNest--;
+	defNest--;
+	yyval = MakeNtNode(T_union, "union", yypvt[-0], nil, nil); 
+    } break;
+case 109:
+# line 590 "parse.y"
+{ /*	struct/union checking	*/
+	structNest--;
+	defNest--;
+	/*	variable/typeid scope management	*/
+	DoScopeOut();
+	yyval = MakeNtNode(T_union, "union", nil, yypvt[-1], nil); 
+    } break;
+case 110:
+# line 598 "parse.y"
+{ /*	struct/union checking	*/
+	structNest--;
+	defNest--;
+	/*	variable/typeid scope management	*/
+	DoScopeOut();
+	yyval = MakeNtNode(T_union, "union", yypvt[-4], yypvt[-1], nil); 
+    } break;
+case 111:
+# line 607 "parse.y"
+{
+	DISARM;		/* for struct tag */
+	/*
+	 *	Set up checking information for a new level
+	 *	of struct/union definition.
+	 *	Initialize all type keeping information for
+	 *	the new structNest level.
+	 */
+	structNest++;
+	defNest++;
+	if (defNest >= MAX_STRUCT_NEST) {
+		parseError("too many levels of struct/union/cast definition");
+		exit(0);
+	}
+	/*	Reset the type declaration.	*/
+	typedefNest[defNest] = 0;
+	yyval = nil;
+    } break;
+case 112:
+# line 627 "parse.y"
+{
+	DISARM;		/* for union tag */
+	/*
+	 *	Set up checking information for a new level
+	 *	of struct/union definition.
+	 */
+	structNest++;
+	defNest++;
+	if (defNest >= MAX_STRUCT_NEST) {
+		parseError("too many levels of struct/union definition");
+		exit(0);
+	}
+	/*	Reset the type declaration.	*/
+	typedefNest[defNest] = 0;
+	yyval = nil;
+    } break;
+case 113:
+# line 645 "parse.y"
+{ ARM; yyval = yypvt[-0]; } break;
+case 114:
+# line 648 "parse.y"
+{ ARM; yyval = yypvt[-0]; } break;
+case 115:
+# line 651 "parse.y"
+{ ARM; DoScopeIn(); yyval = nil; } break;
+case 116:
+# line 654 "parse.y"
+{ yyval = Concat(yypvt[-2], yypvt[-1]); } break;
+case 117:
+# line 656 "parse.y"
+{ yyval = yypvt[-1]; } break;
+case 118:
+# line 659 "parse.y"
+{ /*	first clear the expectTypeID option so the bit
+	 *	field code does not get upset about prior dcltrs.
+	 */
+	/*	Reset the type declaration.	*/
+	typedefNest[defNest] = 0;
+
+	yyval = MakeNtNode(T_fieldDecl, "fieldDecl", yypvt[-4], yypvt[-2], nil); 
+    } break;
+case 119:
+# line 669 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 120:
+# line 671 "parse.y"
+{ yyval = Concat(yypvt[-2], yypvt[-0]); } break;
+case 121:
+# line 674 "parse.y"
+{ yyval = MakeNtNode(T_fieldItem, "fieldItem", yypvt[-0], nil, nil); } break;
+case 122:
+# line 676 "parse.y"
+{ yyval = MakeNtNode(T_fieldItem, "fieldItem", nil, yypvt[-0], nil); } break;
+case 123:
+# line 678 "parse.y"
+{ yyval = MakeNtNode(T_fieldItem, "fieldItem", yypvt[-2], yypvt[-0], nil); } break;
+case 124:
+# line 684 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 125:
+# line 687 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 126:
+# line 689 "parse.y"
+{	yyval = Concat(yypvt[-2], yypvt[-0]); } break;
+case 127:
+# line 695 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 128:
+# line 698 "parse.y"
+{	yyval = yypvt[-0]; } break;
+case 129:
+# line 700 "parse.y"
+{ yyval = Concat(yypvt[-2], yypvt[-0]); } break;
+case 130:
+# line 714 "parse.y"
+{ yyval = MakeNtNode(T_dcltr, "dcltr", yypvt[-0], nil, nil); } break;
+case 131:
+# line 717 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 132:
+# line 719 "parse.y"
+{ yyval = MakeNtNode(T_starDcltr, "*", nil, nil, yypvt[-0]); } break;
+case 133:
+# line 722 "parse.y"
+{ /*	p1Dcltr must be an undefined variable/user_define_type.
+	 *	So we disarm expectTypeID option before calling
+	 *	p1Dcltr.
+	 */
+	yyval = yypvt[-0]; 
+    } break;
+case 134:
+# line 729 "parse.y"
+{ yyval = MakeNtNode(T_funcDcltr, "funcDcltr", yypvt[-2], nil, yypvt[-5]); } break;
+case 135:
+# line 731 "parse.y"
+{ yyval = MakeNtNode(T_arryDcltr, "arryDcltr", nil, nil, yypvt[-2]); } break;
+case 136:
+# line 733 "parse.y"
+{ yyval = MakeNtNode(T_arryDcltr, "arryDcltr", yypvt[-1], nil, yypvt[-3]); } break;
+case 137:
+# line 736 "parse.y"
+{ ARM; yyval = yypvt[-0]; } break;
+case 138:
+# line 738 "parse.y"
+{ ARM; yyval = MakeNtNode(T_enclosure, "enclosure", nil, nil, yypvt[-1]); } break;
+case 139:
+# line 746 "parse.y"
+{ 
+	/*
+	 *	Parameters must be ID, so we disarm expectTypeID.
+	 */
+	yyval = yypvt[-0];
+    } break;
+case 140:
+# line 753 "parse.y"
+{ yyval = nil; } break;
+case 141:
+# line 756 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 142:
+# line 758 "parse.y"
+{ yyval = Concat(yypvt[-2], yypvt[-0]); } break;
+case 143:
+# line 764 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 144:
+# line 766 "parse.y"
+{ /*
+	 *	Typeid can not be initialized.
+	 */
+	if (typedefNest[defNest] > 0) {
+		parseError("can not initialize typeid");
+	}
+     	RightOf(yypvt[-2]) = yypvt[-0];
+     	yyval = yypvt[-2];
+    } break;
+case 145:
+# line 777 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 146:
+# line 779 "parse.y"
+{ yyval = MakeNtNode(T_brace, "brace", yypvt[-1], nil, nil); } break;
+case 147:
+# line 781 "parse.y"
+{ yyval = MakeNtNode(T_brace, "brace", yypvt[-2], nil, nil); } break;
+case 148:
+# line 784 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 149:
+# line 786 "parse.y"
+{ yyval = Concat(yypvt[-2], yypvt[-0]); } break;
+case 150:
+# line 792 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 151:
+# line 794 "parse.y"
+{ yyval = nil; } break;
+case 152:
+# line 797 "parse.y"
+{ yyval = MakeNtNode(T_starDcltr, "p2AbsDcltr", nil, nil, yypvt[-0]); } break;
+case 153:
+# line 799 "parse.y"
+{ yyval = MakeNtNode(T_starDcltr, "p2AbsDcltr", nil, nil, nil); } break;
+case 154:
+# line 801 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 155:
+# line 804 "parse.y"
+{ yyval = MakeNtNode(T_funcDcltr, "p1AbsDcltr", nil, nil, yypvt[-2]); } break;
+case 156:
+# line 806 "parse.y"
+{ yyval = MakeNtNode(T_arryDcltr, "p1AbsDcltr", nil, nil, yypvt[-2]); } break;
+case 157:
+# line 808 "parse.y"
+{ yyval = MakeNtNode(T_arryDcltr, "p1AbsDcltr", yypvt[-1], nil, yypvt[-3]); } break;
+case 158:
+# line 810 "parse.y"
+{ yyval = MakeNtNode(T_funcDcltr, "p1AbsDcltr", nil, nil, nil); } break;
+case 159:
+# line 812 "parse.y"
+{ yyval = MakeNtNode(T_arryDcltr, "p1AbsDcltr", nil, nil, nil); } break;
+case 160:
+# line 814 "parse.y"
+{ yyval = MakeNtNode(T_arryDcltr, "p1AbsDcltr", yypvt[-1], nil, nil); } break;
+case 161:
+# line 816 "parse.y"
+{ /* * This node is required for reverse translation.
+	 */
+	yyval = MakeNtNode(T_enclosure, "p2AbsDcltr", nil, nil, yypvt[-1]); 
+    } break;
+case 162:
+# line 829 "parse.y"
+{ 
+        /*
+         *      It is an error if the symbol has already been 
+         *      defined in the current lexical scope. 
+         *      Except when it was declared as extern variables. 
+         *      typeid has been declared as a part of decl, when
+         *      typedefNest[currentStructNest]>0. 
+         */ 
+        if (typedefNest[defNest] > 0) { 
+                yyval = MakeNewTypeIDNode(); 
+        } else { 
+                yyval = MakeNewIDNode();
+        } 
+    } break;
+case 163:
+# line 848 "parse.y"
+{ yyval = MakeLabel(T_id, "label"); } break;
+case 164:
+# line 852 "parse.y"
+{ yyval = MakeTypeID(); } break;
+case 165:
+# line 856 "parse.y"
+{ yyval = MakeParamID(); } break;
+case 166:
+# line 859 "parse.y"
+{ yyval = MakeVarID(); } break;
+case 167:
+# line 863 "parse.y"
+{ yyval = MakeFieldID(); } break;
+case 168:
+# line 867 "parse.y"
+{ yyval = MakeEnumTag(); } break;
+case 169:
+# line 871 "parse.y"
+{ yyval = MakeStructTag(); } break;
+case 170:
+# line 875 "parse.y"
+{ yyval = MakeUnionTag(); } break;
+case 171:
+# line 888 "parse.y"
+{
+	DISARM;
+	/* *	This is used strictly by rules shown above (stmts, decls) */
+	yyval = MakeNtNode(T_expression, "expression", yypvt[-0], nil, nil); 
+    } break;
+case 172:
+# line 898 "parse.y"
+{
+	DISARM;
+	/* *	This is used strictly by rules shown above (stmts, decls) */
+	yyval = MakeNtNode(T_expression, "expression", yypvt[-0], nil, nil); 
+    } break;
+case 173:
+# line 912 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 174:
+# line 914 "parse.y"
+{ yyval = MakeNtNode(T_comma, ",", yypvt[-2], yypvt[-0], nil); } break;
+case 175:
+# line 920 "parse.y"
+{ ARM; yyval = yypvt[-0]; } break;
+case 176:
+# line 923 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 177:
+# line 925 "parse.y"
+{ yyval = MakeNtNode(T_assign, "=", yypvt[-2], yypvt[-0], nil); } break;
+case 178:
+# line 927 "parse.y"
+{ LeftOf(yypvt[-1]) = yypvt[-2];
+	RightOf(yypvt[-1]) = yypvt[-0];
+	yyval = yypvt[-1];
+    } break;
+case 179:
+# line 933 "parse.y"
+{
+	if (TokenClass==TAplus) {
+		yyval = MakeNtNode(T_Aplus, "+=", nil, nil, nil); 
+	} else
+	if (TokenClass==TAminus) {
+		yyval = MakeNtNode(T_Aminus, "-=", nil, nil, nil); 
+	} else
+	if (TokenClass==TAstar) {
+		yyval = MakeNtNode(T_Astar, "*=", nil, nil, nil); 
+	} else
+	if (TokenClass==TAdiv) {
+		yyval = MakeNtNode(T_Adiv, "/=", nil, nil, nil); 
+	} else
+	if (TokenClass==TAmod) {
+		yyval = MakeNtNode(T_Amod, "%=", nil, nil, nil); 
+	} else
+	if (TokenClass==TArshft) {
+		yyval = MakeNtNode(T_Arshft, ">>=", nil, nil, nil); 
+	} else
+	if (TokenClass==TAlshft) {
+		yyval = MakeNtNode(T_Alshft, "<<=", nil, nil, nil); 
+	} else
+	if (TokenClass==TAand) {
+		yyval = MakeNtNode(T_Aand, "&=", nil, nil, nil); 
+	} else
+	if (TokenClass==TAor) {
+		yyval = MakeNtNode(T_Aor, "|=", nil, nil, nil); 
+	} else
+	if (TokenClass==TAxor) {
+		yyval = MakeNtNode(T_Axor, "^=", nil, nil, nil); 
+	} else {
+		parseError("illegal ASGNOP operation");
+		yyval = MakeNtNode(T_noop, "error", nil, nil, nil);
+	}
+    } break;
+case 180:
+# line 973 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 181:
+# line 975 "parse.y"
+{ yyval = MakeNtNode(T_quest, "?", yypvt[-5], 
+		MakeNtNode(T_colon, ":", yypvt[-3], yypvt[-0], nil), nil); 
+    } break;
+case 182:
+# line 980 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 183:
+# line 982 "parse.y"
+{ yyval = MakeNtNode(T_disj, "||", yypvt[-2], yypvt[-0], nil); } break;
+case 184:
+# line 985 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 185:
+# line 987 "parse.y"
+{ yyval = MakeNtNode(T_conj, "&&", yypvt[-2], yypvt[-0], nil); } break;
+case 186:
+# line 990 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 187:
+# line 992 "parse.y"
+{ yyval = MakeNtNode(T_or, "|", yypvt[-2], yypvt[-0], nil); } break;
+case 188:
+# line 995 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 189:
+# line 997 "parse.y"
+{ yyval = MakeNtNode(T_xor, "^", yypvt[-2], yypvt[-0], nil); } break;
+case 190:
+# line 1000 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 191:
+# line 1002 "parse.y"
+{ yyval = MakeNtNode(T_and, "&", yypvt[-2], yypvt[-0], nil); } break;
+case 192:
+# line 1005 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 193:
+# line 1007 "parse.y"
+{ LeftOf(yypvt[-1]) = yypvt[-2];
+	RightOf(yypvt[-1]) = yypvt[-0];
+	yyval = yypvt[-1];
+    } break;
+case 194:
+# line 1013 "parse.y"
+{ if (TokenClass==Teq) {
+		yyval = MakeNtNode(T_eq, "==", nil, nil, nil); 
+	} else
+	if (TokenClass==Tne) {
+		yyval = MakeNtNode(T_ne, "!=", nil, nil, nil); 
+	} else {
+		parseError("illegal EQU_OP");
+		yyval = MakeNtNode(T_noop, "error", nil, nil, nil);
+	}
+    } break;
+case 195:
+# line 1025 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 196:
+# line 1027 "parse.y"
+{ 	
+	LeftOf(yypvt[-1]) = yypvt[-2];
+	RightOf(yypvt[-1]) = yypvt[-0];
+	yyval = yypvt[-1];
+    } break;
+case 197:
+# line 1034 "parse.y"
+{
+	/*
+	 * Find out which relational operation this is really is.
+	 */
+	if (TokenClass==Tlt) {
+		yyval = MakeNtNode(T_lt, "<", nil, nil, nil);
+	} else
+	if (TokenClass==Tle) {
+		yyval = MakeNtNode(T_le, "<=", nil, nil, nil);
+	} else
+	if (TokenClass==Tge) {
+		yyval = MakeNtNode(T_ge, ">=", nil, nil, nil);
+	} else
+	if (TokenClass==Tgt) {
+		yyval = MakeNtNode(T_gt, ">", nil, nil, nil);
+	} else {
+		parseError("illegal REL_OP");
+		yyval = MakeNtNode(T_noop, "error", nil, nil, nil);
+	}
+    } break;
+case 198:
+# line 1056 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 199:
+# line 1058 "parse.y"
+{ yyval = MakeNtNode(T_rshft, ">>", yypvt[-2], yypvt[-0], nil); } break;
+case 200:
+# line 1060 "parse.y"
+{ yyval = MakeNtNode(T_lshft, "<<", yypvt[-2], yypvt[-0], nil); } break;
+case 201:
+# line 1063 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 202:
+# line 1065 "parse.y"
+{ yyval = MakeNtNode(T_add, "+", yypvt[-2], yypvt[-0], nil); } break;
+case 203:
+# line 1067 "parse.y"
+{ yyval = MakeNtNode(T_sub, "-", yypvt[-2], yypvt[-0], nil); } break;
+case 204:
+# line 1070 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 205:
+# line 1072 "parse.y"
+{ yyval = MakeNtNode(T_mul, "*", yypvt[-2], yypvt[-0], nil); } break;
+case 206:
+# line 1074 "parse.y"
+{ yyval = MakeNtNode(T_div, "/", yypvt[-2], yypvt[-0], nil); } break;
+case 207:
+# line 1076 "parse.y"
+{ yyval = MakeNtNode(T_mod, "%", yypvt[-2], yypvt[-0], nil); } break;
+case 208:
+# line 1082 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 209:
+# line 1084 "parse.y"
+{ yyval = MakeNtNode(T_cast, "cast", yypvt[-2], yypvt[-0], nil); } break;
+case 210:
+# line 1087 "parse.y"
+{ defNest--;
+	yyval = MakeNtNode(T_castHead, "castHead", yypvt[-2], yypvt[-1], nil); 
+    } break;
+case 211:
+# line 1092 "parse.y"
+{ /*
+	 *	Set up checking information for a new level
+	 *	of struct/union/cast definition.
+	 *	Initialize all type keeping information for
+	 *	the new cast level.
+	 */
+	defNest++;
+	if (defNest >= MAX_STRUCT_NEST) {
+		parseError("too many levels of struct/union/cast definition");
+		exit(0);
+	}
+	/*	Reset the type declaration.	*/
+	typedefNest[defNest] = 0;
+	yyval = nil;
+    } break;
+case 212:
+# line 1112 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 213:
+# line 1114 "parse.y"
+{ yyval = MakeNtNode(T_sizeof, "sizeof", yypvt[-0], nil, nil); } break;
+case 214:
+# line 1116 "parse.y"
+{ yyval = MakeNtNode(T_preinc, "pre++", yypvt[-0], nil, nil); } break;
+case 215:
+# line 1118 "parse.y"
+{ yyval = MakeNtNode(T_predec, "pre--", yypvt[-0], nil, nil); } break;
+case 216:
+# line 1120 "parse.y"
+{ yyval = MakeNtNode(T_indr, "*", yypvt[-0], nil, nil); } break;
+case 217:
+# line 1122 "parse.y"
+{ yyval = MakeNtNode(T_addr, "&", yypvt[-0], nil, nil); } break;
+case 218:
+# line 1124 "parse.y"
+{ yyval = MakeNtNode(T_neg, "-", yypvt[-0], nil, nil); } break;
+case 219:
+# line 1126 "parse.y"
+{ yyval = MakeNtNode(T_not, "!", yypvt[-0], nil, nil); } break;
+case 220:
+# line 1128 "parse.y"
+{ yyval = MakeNtNode(T_inv, "~", yypvt[-0], nil, nil); } break;
+case 221:
+# line 1134 "parse.y"
+{ yyval = yypvt[-0]; } break;
+case 222:
+# line 1136 "parse.y"
+{ yyval = MakeNtNode(T_postinc, "post++", yypvt[-1], nil, nil); } break;
+case 223:
+# line 1138 "parse.y"
+{ yyval = MakeNtNode(T_postdec, "post--", yypvt[-1], nil, nil); } break;
+case 224:
+# line 1140 "parse.y"
+{ yyval = MakeNtNode(T_index, "index", yypvt[-3], yypvt[-1], nil); } break;
+case 225:
+# line 1142 "parse.y"
+{ yyval = MakeNtNode(T_call, "call", yypvt[-2], nil, nil); } break;
+case 226:
+# line 1144 "parse.y"
+{ yyval = MakeNtNode(T_call, "call", yypvt[-3], yypvt[-1], nil); } break;
+case 227:
+# line 1146 "parse.y"
+{ ARM; yyval = MakeNtNode(T_dot, "dot", yypvt[-3], yypvt[-0], nil); } break;
+case 228:
+# line 1148 "parse.y"
+{ ARM; yyval = MakeNtNode(T_arrow, "arrow", yypvt[-3], yypvt[-0], nil); } break;
+case 229:
+# line 1154 "parse.y"
+{
+	/*
+	 *	Although we are in armed state, as long as
+	 *	all TYPE_IDs and IDs are disjoint, we have
+	 *	no problem here.
+	 */
+	yyval = yypvt[-0]; 
+    } break;
+case 230:
+# line 1163 "parse.y"
+{ yyval = MakeScalarNode(T_scalar); } break;
+case 231:
+# line 1165 "parse.y"
+{ yyval = MakeScalarNode(T_lscalar); } break;
+case 232:
+# line 1167 "parse.y"
+{ yyval = MakeScalarNode(T_real); } break;
+case 233:
+# line 1169 "parse.y"
+{ yyval = MakeScalarNode(T_char_lit); } break;
+case 234:
+# line 1171 "parse.y"
+{ yyval = MakeScalarNode(T_string_lit); } break;
+case 235:
+# line 1173 "parse.y"
+{ yyval = MakeNtNode(T_compound, "compoundExp", yypvt[-1], nil, nil); } break;
+case 236:
+# line 1175 "parse.y"
+{ yyval = MakeNtNode(T_sizeof, "sizeof", yypvt[-2], nil, nil); } break;
+case 237:
+# line 1178 "parse.y"
+{ ARM; yyval = nil; } break;
+		}
+		goto yystack;  /* stack new state and value */
+
+	}

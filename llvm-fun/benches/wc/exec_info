@@ -1,0 +1,7 @@
+SETUP = ln -sf ${BENCH_DIR}/inputs/gift.txt . ; \
+        ln -sf ${BENCH_DIR}/inputs/alice.txt .
+PROF_ARGS = gift.txt
+TEST_ARGS = alice.txt
+PROF_CHECK = diff ${RESULT_FILE} ${BENCH_DIR}/outputs/gift.out
+TEST_CHECK = diff ${RESULT_FILE} ${BENCH_DIR}/outputs/alice.out
+CLEANUP = rm -f gift.txt alice.txt

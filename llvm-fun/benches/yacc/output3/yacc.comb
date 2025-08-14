@@ -1,0 +1,753 @@
+
+conflicts: 40 shift/reduce
+
+# line 89 "cexp.y"
+#include <setjmp.h>
+/* #define YYDEBUG 1 */
+
+  static int yylex ();
+  static yyerror ();
+  int expression_value;
+
+  static jmp_buf parse_return_error;
+
+  /* some external tables of character types */
+  extern unsigned char is_idstart[], is_idchar[];
+
+
+# line 103 "cexp.y"
+typedef union  {
+  long lval;
+  int voidval;
+  char *sval;
+} YYSTYPE;
+# define INT 257
+# define CHAR 258
+# define NAME 259
+# define ERROR 260
+# define OR 261
+# define AND 262
+# define EQUAL 263
+# define NOTEQUAL 264
+# define LEQ 265
+# define GEQ 266
+# define LSH 267
+# define RSH 268
+# define UNARY 269
+#define yyclearin yychar = -1
+#define yyerrok yyerrflag = 0
+extern int yychar;
+extern short yyerrflag;
+#ifndef YYMAXDEPTH
+#define YYMAXDEPTH 150
+#endif
+YYSTYPE yylval, yyval;
+# define YYERRCODE 256
+
+# line 196 "cexp.y"
+
+
+/* During parsing of a C expression, the pointer to the next character
+   is in this variable.  */
+
+static char *lexptr;
+
+/* Take care of parsing a number (anything that starts with a digit).
+   Set yylval and return the token type; update lexptr.
+   LEN is the number of characters in it.  */
+
+/* maybe needs to actually deal with floating point numbers */
+
+static int
+parse_number (olen)
+     int olen;
+{
+  register char *p = lexptr;
+  register long n = 0;
+  register int c;
+  register int base = 10;
+  register len = olen;
+  char *err_copy;
+
+  extern double atof ();
+
+  for (c = 0; c < len; c++)
+    if (p[c] == '.') {
+      /* It's a float since it contains a point.  */
+      yyerror ("floating point numbers not allowed in #if expressions");
+      return ERROR;
+      
+/* ****************
+	 yylval.dval = atof (p);
+	 lexptr += len;
+	 return FLOAT;
+		 ****************  */
+    }
+  
+  if (len >= 3 && (!strncmp (p, "0x", 2) || !strncmp (p, "0X", 2))) {
+    p += 2;
+    base = 16;
+    len -= 2;
+  }
+  else if (*p == '0')
+    base = 8;
+  
+  while (len-- > 0) {
+    c = *p++;
+    n *= base;
+    if (c >= '0' && c <= '9')
+      n += c - '0';
+    else {
+      if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+      if (base == 16 && c >= 'a' && c <= 'f')
+	n += c - 'a' + 10;
+      else if (len == 0 && c == 'l')
+	;
+      else {
+	yyerror ("Invalid number in #if expression");
+	return ERROR;
+      }
+    }
+  }
+
+  lexptr = p;
+  yylval.lval = n;
+  return INT;
+}
+
+struct token {
+  char *operator;
+  int token;
+};
+
+#define NULL 0
+
+static struct token tokentab2[] = {
+  {"&&", AND},
+  {"||", OR},
+  {"<<", LSH},
+  {">>", RSH},
+  {"==", EQUAL},
+  {"!=", NOTEQUAL},
+  {"<=", LEQ},
+  {">=", GEQ},
+  {NULL, ERROR}
+};
+
+/* Read one token, getting characters through lexptr.  */
+
+static int
+yylex ()
+{
+  register int c;
+  register int namelen;
+  register char *tokstart;
+  register struct token *toktab;
+
+ retry:
+
+  tokstart = lexptr;
+  c = *tokstart;
+  /* See if it is a special token of length 2.  */
+  for (toktab = tokentab2; toktab->operator != NULL; toktab++)
+    if (c == *toktab->operator && tokstart[1] == toktab->operator[1]) {
+      lexptr += 2;
+      return toktab->token;
+    }
+
+  switch (c) {
+  case 0:
+    return 0;
+    
+  case ' ':
+  case '\t':
+  case '\n':
+    lexptr++;
+    goto retry;
+    
+  case '\'':
+    lexptr++;
+    c = *lexptr++;
+    if (c == '\\')
+      c = parse_escape (&lexptr);
+    yylval.lval = c;
+    c = *lexptr++;
+    if (c != '\'') {
+      yyerror ("Invalid character constant in #if");
+      return ERROR;
+    }
+    
+    return CHAR;
+
+  case '/':			/* possible comment */
+    if (*lexptr != '*')
+      return c;
+    for (;;) {
+      while (*lexptr != '\0') {
+	if (*lexptr++ == '*' && *lexptr == '/') {
+	  lexptr++;
+	  goto retry;
+	}
+      }
+    }
+
+    /* some of these chars are invalid in constant expressions;
+       maybe do something about them later */
+  case '+':
+  case '-':
+  case '*':
+  case '%':
+  case '|':
+  case '&':
+  case '^':
+  case '~':
+  case '!':
+  case '@':
+  case '<':
+  case '>':
+  case '(':
+  case ')':
+  case '[':
+  case ']':
+  case '.':
+  case '?':
+  case ':':
+  case '=':
+  case '{':
+  case '}':
+  case ',':
+    lexptr++;
+    return c;
+    
+  case '"':
+    yyerror ("double quoted strings not allowed in #if expressions");
+    return ERROR;
+  }
+  if (c >= '0' && c <= '9') {
+    /* It's a number */
+    for (namelen = 0;
+	 c = tokstart[namelen], is_idchar[c] || c == '.'; 
+	 namelen++)
+      ;
+    return parse_number (namelen);
+  }
+  
+  if (!is_idstart[c]) {
+    yyerror ("Invalid token in expression");
+    return ERROR;
+  }
+  
+  /* It is a name.  See how long it is.  */
+  
+  for (namelen = 0; is_idchar[tokstart[namelen]]; namelen++)
+    ;
+  
+  lexptr += namelen;
+  return NAME;
+}
+
+
+/* Parse a C escape sequence.  STRING_PTR points to a variable
+   containing a pointer to the string to parse.  That pointer
+   is updated past the characters we use.  The value of the
+   escape sequence is returned.
+
+   A negative value means the sequence \ newline was seen,
+   which is supposed to be equivalent to nothing at all.
+
+   If \ is followed by a null character, we return a negative
+   value and leave the string pointer pointing at the null character.
+
+   If \ is followed by 000, we return 0 and leave the string pointer
+   after the zeros.  A value of 0 does not mean end of string.  */
+
+static int
+parse_escape (string_ptr)
+     char **string_ptr;
+{
+  register int c = *(*string_ptr)++;
+  switch (c)
+    {
+    case 'a':
+      return '\a';
+    case 'b':
+      return '\b';
+    case 'e':
+      return 033;
+    case 'f':
+      return '\f';
+    case 'n':
+      return '\n';
+    case 'r':
+      return '\r';
+    case 't':
+      return '\t';
+    case 'v':
+      return '\v';
+    case '\n':
+      return -2;
+    case 0:
+      (*string_ptr)--;
+      return 0;
+    case '^':
+      c = *(*string_ptr)++;
+      if (c == '\\')
+	c = parse_escape (string_ptr);
+      if (c == '?')
+	return 0177;
+      return (c & 0200) | (c & 037);
+      
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+      {
+	register int i = c - '0';
+	register int count = 0;
+	while (++count < 3)
+	  {
+	    if ((c = *(*string_ptr)++) >= '0' && c <= '7')
+	      {
+		i *= 8;
+		i += c - '0';
+	      }
+	    else
+	      {
+		(*string_ptr)--;
+		break;
+	      }
+	  }
+	return i;
+      }
+    default:
+      return c;
+    }
+}
+
+static
+yyerror (s)
+     char *s;
+{
+  error (s);
+  longjmp (parse_return_error, 1);
+}
+
+/* This page contains the entry point to this file.  */
+
+/* Parse STRING as an expression, and complain if this fails
+   to use up all of the contents of STRING.  */
+int
+parse_c_expression (string)
+     char *string;
+{
+  lexptr = string;
+  
+  if (lexptr == 0 || *lexptr == 0) {
+    error ("empty #if expression");
+    return 0;			/* don't include the #if group */
+  }
+
+  /* if there is some sort of scanning error, just return 0 and assume
+     the parsing routine has printed an error message somewhere.
+     there is surely a better thing to do than this.     */
+  if (setjmp(parse_return_error))
+    return 0;
+
+  if (yyparse ())
+    return 0;			/* actually this is never reached
+				   the way things stand. */
+  if (*lexptr)
+    error ("Junk after end of expression.");
+
+  return expression_value;	/* set by yyparse() */
+}
+
+#ifdef TEST_EXP_READER
+/* main program, for testing purposes. */
+main()
+{
+  int n;
+  char buf[1024];
+  extern int yydebug;
+/*
+  yydebug = 1;
+*/
+  initialize_random_junk ();
+
+  for (;;) {
+    printf("enter expression: ");
+    n = 0;
+    while ((buf[n] = getchar()) != '\n')
+      n++;
+    buf[n] = '\0';
+    printf("parser returned %d\n", parse_c_expression(buf));
+  }
+}
+
+/* table to tell if char can be part of a C identifier. */
+char is_idchar[256];
+/* table to tell if char can be first char of a c identifier. */
+char is_idstart[256];
+/* table to tell if c is horizontal space.  isspace() thinks that
+   newline is space; this is not a good idea for this program. */
+char is_hor_space[256];
+
+/*
+ * initialize random junk in the hash table and maybe other places
+ */
+initialize_random_junk()
+{
+  register int i;
+
+  /*
+   * Set up is_idchar and is_idstart tables.  These should be
+   * faster than saying (is_alpha(c) || c == '_'), etc.
+   * Must do set up these things before calling any routines tthat
+   * refer to them.
+   */
+  for (i = 'a'; i <= 'z'; i++) {
+    ++is_idchar[i - 'a' + 'A'];
+    ++is_idchar[i];
+    ++is_idstart[i - 'a' + 'A'];
+    ++is_idstart[i];
+  }
+  for (i = '0'; i <= '9'; i++)
+    ++is_idchar[i];
+  ++is_idchar['_'];
+  ++is_idstart['_'];
+
+  /* horizontal space table */
+  ++is_hor_space[' '];
+  ++is_hor_space['\t'];
+}
+
+error (msg)
+{
+  printf("error: %s\n", msg);
+}
+#endif
+short yyexca[] ={
+-1, 1,
+	0, -1,
+	-2, 0,
+	};
+# define YYNPROD 30
+# define YYLAST 371
+short yyact[]={
+
+  14,  25,  30,  11,  14,  12,  15,   2,  16,  12,
+  13,   1,  14,  25,  13,  34,   0,  12,  15,   0,
+  16,  56,  13,  23,  55,  24,  30,  11,   0,   5,
+  30,   0,   0,   0,   0,  23,   7,  24,  30,  14,
+  25,   4,   0,   0,  12,  15,   0,  16,   0,  13,
+  14,  25,   0,   0,   0,  12,  15,  26,  16,   0,
+  13,   0,  23,   0,  24,  30,   0,   0,   0,  26,
+   0,   0,   0,  23,   0,  24,  30,   0,  14,  25,
+   0,   0,   0,  12,  15,   0,  16,  27,  13,   0,
+   0,   0,  14,  25,   0,   0,  26,  12,  15,  27,
+  16,  23,  13,  24,  30,   0,  14,  26,   0,   0,
+   0,  12,  15,   0,  16,  23,  13,  24,  30,   0,
+   0,   0,   6,   0,   0,   0,  27,   0,  14,  23,
+   0,  24,  30,  12,  15,  26,  16,  27,  13,  14,
+   0,   0,   0,   0,  12,  15,   0,  16,   0,  13,
+   0,  23,   0,  24,  30,   3,   0,   0,   0,   0,
+  31,  32,  33,   0,   0,  30,   0,  35,  36,  37,
+  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,
+  48,  49,  50,  51,  52,  53,  54,  14,   0,   0,
+   0,   0,  12,  15,   0,  16,   0,  13,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,  57,  30,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,  29,  28,  19,  20,  21,  22,
+  17,  18,   0,   0,   0,   0,  29,  28,  19,  20,
+  21,  22,  17,  18,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   8,   9,  10,   0,   0,   0,   0,
+   0,   0,   0,   0,  28,  19,  20,  21,  22,  17,
+  18,   0,   0,   0,   0,   0,  19,  20,  21,  22,
+  17,  18,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,  19,  20,  21,  22,  17,  18,
+   0,   0,   0,   0,   0,   0,   0,   0,  19,  20,
+  21,  22,  17,  18,   0,   0,   0,   0,   0,   0,
+   0,   0,  19,  20,  21,  22,  17,  18,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,  21,  22,  17,  18,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,  17,
+  18 };
+short yypact[]={
+
+  -4,-1000, -41, -25,  -4,  -4,  -4,  -4,-1000,-1000,
+-1000,  -4,  -4,  -4,  -4,  -4,  -4,  -4,  -4,  -4,
+  -4,  -4,  -4,  -4,  -4,  -4,  -4,  -4,  -4,  -4,
+  -4, -61, -61, -61, -17, -25, -61, -61, -61, -33,
+ -33, 150, 150,  91,  91, 102, 102, 102, 102,  69,
+  55,  41,  13,   2, -37,-1000,  -4, -25 };
+short yypgo[]={
+
+   0, 155,   7,  11 };
+short yyr1[]={
+
+   0,   3,   2,   2,   1,   1,   1,   1,   1,   1,
+   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
+   1,   1,   1,   1,   1,   1,   1,   1,   1,   1 };
+short yyr2[]={
+
+   0,   1,   1,   3,   2,   2,   2,   3,   3,   3,
+   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,
+   3,   3,   3,   3,   3,   3,   5,   1,   1,   1 };
+short yychk[]={
+
+-1000,  -3,  -2,  -1,  45,  33, 126,  40, 257, 258,
+ 259,  44,  42,  47,  37,  43,  45, 267, 268, 263,
+ 264, 265, 266,  60,  62,  38,  94, 124, 262, 261,
+  63,  -1,  -1,  -1,  -2,  -1,  -1,  -1,  -1,  -1,
+  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+  -1,  -1,  -1,  -1,  -1,  41,  58,  -1 };
+short yydef[]={
+
+   0,  -2,   1,   2,   0,   0,   0,   0,  27,  28,
+  29,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   4,   5,   6,   0,   3,   8,   9,  10,  11,
+  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,
+  22,  23,  24,  25,   0,   7,   0,  26 };
+#ifndef lint
+static	char yaccpar_sccsid[] = "@(#)yaccpar 1.1 86/09/25 SMI"; /* from UCB 4.1 83/02/11 */
+#endif
+
+#
+# define YYFLAG -1000
+# define YYERROR goto yyerrlab
+# define YYACCEPT return(0)
+# define YYABORT return(1)
+
+/*	parser for yacc output	*/
+
+#ifdef YYDEBUG
+int yydebug = 0; /* 1 for debugging */
+#endif
+YYSTYPE yyv[YYMAXDEPTH]; /* where the values are stored */
+int yychar = -1; /* current input token number */
+int yynerrs = 0;  /* number of errors */
+short yyerrflag = 0;  /* error recovery flag */
+
+yyparse() {
+
+	short yys[YYMAXDEPTH];
+	short yyj, yym;
+	register YYSTYPE *yypvt;
+	register short yystate, *yyps, yyn;
+	register YYSTYPE *yypv;
+	register short *yyxi;
+
+	yystate = 0;
+	yychar = -1;
+	yynerrs = 0;
+	yyerrflag = 0;
+	yyps= &yys[-1];
+	yypv= &yyv[-1];
+
+ yystack:    /* put a state and value onto the stack */
+
+#ifdef YYDEBUG
+	if( yydebug  ) printf( "state %d, char 0%o\n", yystate, yychar );
+#endif
+		if( ++yyps>= &yys[YYMAXDEPTH] ) { yyerror( "yacc stack overflow" ); return(1); }
+		*yyps = yystate;
+		++yypv;
+		*yypv = yyval;
+
+ yynewstate:
+
+	yyn = yypact[yystate];
+
+	if( yyn<= YYFLAG ) goto yydefault; /* simple state */
+
+	if( yychar<0 ) if( (yychar=yylex())<0 ) yychar=0;
+	if( (yyn += yychar)<0 || yyn >= YYLAST ) goto yydefault;
+
+	if( yychk[ yyn=yyact[ yyn ] ] == yychar ){ /* valid shift */
+		yychar = -1;
+		yyval = yylval;
+		yystate = yyn;
+		if( yyerrflag > 0 ) --yyerrflag;
+		goto yystack;
+		}
+
+ yydefault:
+	/* default state action */
+
+	if( (yyn=yydef[yystate]) == -2 ) {
+		if( yychar<0 ) if( (yychar=yylex())<0 ) yychar = 0;
+		/* look through exception table */
+
+		for( yyxi=yyexca; (*yyxi!= (-1)) || (yyxi[1]!=yystate) ; yyxi += 2 ) ; /* VOID */
+
+		while( *(yyxi+=2) >= 0 ){
+			if( *yyxi == yychar ) break;
+			}
+		if( (yyn = yyxi[1]) < 0 ) return(0);   /* accept */
+		}
+
+	if( yyn == 0 ){ /* error */
+		/* error ... attempt to resume parsing */
+
+		switch( yyerrflag ){
+
+		case 0:   /* brand new error */
+
+			yyerror( "syntax error" );
+		yyerrlab:
+			++yynerrs;
+
+		case 1:
+		case 2: /* incompletely recovered error ... try again */
+
+			yyerrflag = 3;
+
+			/* find a state where "error" is a legal shift action */
+
+			while ( yyps >= yys ) {
+			   yyn = yypact[*yyps] + YYERRCODE;
+			   if( yyn>= 0 && yyn < YYLAST && yychk[yyact[yyn]] == YYERRCODE ){
+			      yystate = yyact[yyn];  /* simulate a shift of "error" */
+			      goto yystack;
+			      }
+			   yyn = yypact[*yyps];
+
+			   /* the current yyps has no shift onn "error", pop stack */
+
+#ifdef YYDEBUG
+			   if( yydebug ) printf( "error recovery pops state %d, uncovers %d\n", *yyps, yyps[-1] );
+#endif
+			   --yyps;
+			   --yypv;
+			   }
+
+			/* there is no state on the stack with an error shift ... abort */
+
+	yyabort:
+			return(1);
+
+
+		case 3:  /* no shift yet; clobber input char */
+
+#ifdef YYDEBUG
+			if( yydebug ) printf( "error recovery discards char %d\n", yychar );
+#endif
+
+			if( yychar == 0 ) goto yyabort; /* don't discard EOF, quit */
+			yychar = -1;
+			goto yynewstate;   /* try again in the same state */
+
+			}
+
+		}
+
+	/* reduction by production yyn */
+
+#ifdef YYDEBUG
+		if( yydebug ) printf("reduce %d\n",yyn);
+#endif
+		yyps -= yyr2[yyn];
+		yypvt = yypv;
+		yypv -= yyr2[yyn];
+		yyval = yypv[1];
+		yym=yyn;
+			/* consult goto table to find next state */
+		yyn = yyr1[yyn];
+		yyj = yypgo[yyn] + *yyps + 1;
+		if( yyj>=YYLAST || yychk[ yystate = yyact[yyj] ] != -yyn ) yystate = yyact[yypgo[yyn]];
+		switch(yym){
+			
+case 1:
+# line 130 "cexp.y"
+{ expression_value = yypvt[-0].lval; } break;
+case 3:
+# line 136 "cexp.y"
+{ yyval.lval = yypvt[-0].lval; } break;
+case 4:
+# line 141 "cexp.y"
+{ yyval.lval = - yypvt[-0].lval; } break;
+case 5:
+# line 143 "cexp.y"
+{ yyval.lval = ! yypvt[-0].lval; } break;
+case 6:
+# line 145 "cexp.y"
+{ yyval.lval = ~ yypvt[-0].lval; } break;
+case 7:
+# line 147 "cexp.y"
+{ yyval.lval = yypvt[-1].lval; } break;
+case 8:
+# line 152 "cexp.y"
+{ yyval.lval = yypvt[-2].lval * yypvt[-0].lval; } break;
+case 9:
+# line 154 "cexp.y"
+{ yyval.lval = yypvt[-2].lval / yypvt[-0].lval; } break;
+case 10:
+# line 156 "cexp.y"
+{ yyval.lval = yypvt[-2].lval % yypvt[-0].lval; } break;
+case 11:
+# line 158 "cexp.y"
+{ yyval.lval = yypvt[-2].lval + yypvt[-0].lval; } break;
+case 12:
+# line 160 "cexp.y"
+{ yyval.lval = yypvt[-2].lval - yypvt[-0].lval; } break;
+case 13:
+# line 162 "cexp.y"
+{ yyval.lval = yypvt[-2].lval << yypvt[-0].lval; } break;
+case 14:
+# line 164 "cexp.y"
+{ yyval.lval = yypvt[-2].lval >> yypvt[-0].lval; } break;
+case 15:
+# line 166 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval == yypvt[-0].lval); } break;
+case 16:
+# line 168 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval != yypvt[-0].lval); } break;
+case 17:
+# line 170 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval <= yypvt[-0].lval); } break;
+case 18:
+# line 172 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval >= yypvt[-0].lval); } break;
+case 19:
+# line 174 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval < yypvt[-0].lval); } break;
+case 20:
+# line 176 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval > yypvt[-0].lval); } break;
+case 21:
+# line 178 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval & yypvt[-0].lval); } break;
+case 22:
+# line 180 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval ^ yypvt[-0].lval); } break;
+case 23:
+# line 182 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval | yypvt[-0].lval); } break;
+case 24:
+# line 184 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval && yypvt[-0].lval); } break;
+case 25:
+# line 186 "cexp.y"
+{ yyval.lval = (yypvt[-2].lval || yypvt[-0].lval); } break;
+case 26:
+# line 188 "cexp.y"
+{ yyval.lval = yypvt[-4].lval ? yypvt[-2].lval : yypvt[-0].lval; } break;
+case 27:
+# line 190 "cexp.y"
+{ yyval.lval = yylval.lval; } break;
+case 28:
+# line 192 "cexp.y"
+{ yyval.lval = yylval.lval; } break;
+case 29:
+# line 194 "cexp.y"
+{ yyval.lval = 0; } break;
+		}
+		goto yystack;  /* stack new state and value */
+
+	}

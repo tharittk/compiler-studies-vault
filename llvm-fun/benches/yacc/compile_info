@@ -1,0 +1,2 @@
+OBJFILES_BC = y1.bc y2.bc y3.bc y4.bc
+CFLAGS = -w -Wno-return-type

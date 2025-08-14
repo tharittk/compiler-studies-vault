@@ -362,7 +362,7 @@ Value *LLVMGenerator::RegisterPrintIntIR()
   builder.SetInsertPoint(BB);
   // actual print
   Value *fmt = builder.CreateGlobalStringPtr("LLVM IR Printint: %d \n");
-  Value *callRes = builder.CreateCall(printfFunc, {fmt, AI});
+  Value *callRes = builder.CreateCall(printfFunc, ArrayRef<Value*>({fmt, AI}));
   builder.CreateRet(callRes);
   verifyFunction(*printIntFunc);
   return printIntFunc;

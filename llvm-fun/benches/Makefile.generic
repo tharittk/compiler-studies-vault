@@ -1,0 +1,282 @@
+# Assignment nmber
+AS_NO := 5
+GRADING_MODE ?= 0
+MEM2REG ?= 1
+ifeq ($(GRADING_MODE), 1)
+VERBOSE := 0
+else
+VERBOSE := 1
+endif
+
+BENCH_NAME ?= $(shell cd .. && basename `pwd`)
+BENCH_DIR ?= ../../../benches/$(BENCH_NAME)
+RESULT_FILE ?= $(BENCH_NAME).result
+
+# File names
+BINARY = bench
+PLAIN = $(BINARY).plain
+CANON = $(BINARY)
+CANON_OPTI = $(BINARY).opti
+PROF = $(BINARY).prof
+BB_PROF = $(BINARY).bb.prof
+EDGE_PROF = $(BINARY).edge.prof
+SB = $(BINARY).sb
+SB_PROF = $(BINARY).sb.prof
+SB_OPTI = $(BINARY).sb.opti
+
+ifeq ($(AS_NO), 5)
+all: $(CANON).ll $(PROF).ll prof_dump.txt
+else
+all: $(CANON).ll $(CANON_OPTI).out prof_dump.txt $(SB).ll $(SB).out prof_dump.sb.txt $(SB_OPTI).out
+endif
+
+-include ../compile_info
+-include ../exec_info
+
+# Tools
+LLVM_CC ?= clang
+LLVM_CXX ?= clang++
+LLVM_LINK ?= llvm-link
+LLVM_OPT ?= opt
+LLVM_DIS ?= llvm-dis
+TIME ?= /usr/bin/time
+
+ARGS ?=
+LIBS ?=
+
+# Flags
+LLVM_CFLAGS ?= -c -emit-llvm -O0 $(PREPROCESSING_OPTIONS) $(CFLAGS)
+LLVM_LINK_FLAGS ?=
+
+# opt options
+ifeq ($(MEM2REG), 1)
+CANON_OPTS ?= -break-crit-edges -mem2reg
+else
+CANON_OPTS ?= -break-crit-edges
+endif
+FINAL_OPTS = -O3 -unroll-allow-partial
+ifeq ($(VERBOSE), 1)
+PROF_OPTS = -bb-profiler -edge-profiler -stats -debug-only=cfg-profiler
+PROF_PRINT_OPTS = -bb-profile-loader -edge-profile-loader -profile-printer -dump-bb-info -dump-edge-info -stats -debug-only=cfg-profiler
+# Some students might have used domtree stuff..
+SB_OPTS = -domtree -postdomtree -domfrontier -superblock-formation -stats -debug-only=superblock-formation
+else
+PROF_OPTS = -bb-profiler -edge-profiler
+PROF_PRINT_OPTS = -bb-profile-loader -edge-profile-loader -profile-printer -dump-bb-info -dump-edge-info
+SB_OPTS = -domtree -postdomtree -domfrontier -superblock-formation
+endif
+
+# libraries to be loaded from opt
+PROF_LIB = $(COS320_SRC_ROOT)/Debug+Asserts/lib/Profile.so
+SB_LIB = $(COS320_SRC_ROOT)/Debug+Asserts/lib/Superblock.so
+PROF_LIBS = \
+  -load $(PROF_LIB)
+SB_LIBS = \
+  $(PROF_LIBS) \
+  -load $(SB_LIB)
+
+# c/cpp to bc file generation
+OBJFILES_BC ?= $(shell find . -name \*.c | sed -e "s/\.c/.bc/" ) \
+               $(shell find . -name \*.C | sed -e "s/\.C/.bc/" ) \
+               $(shell find . -name \*.cpp | sed -e "s/\.cpp/.bc/" ) \
+               $(shell find . -name \*.cc | sed -e "s/\.cc/.bc/" )
+%.bc: %.c
+	$(LLVM_CC) $(LLVM_CFLAGS) $< -o $@
+%.bc: %.C
+	$(LLVM_CC) $(LLVM_CFLAGS) $< -o $@
+%.bc: %.cpp
+	$(LLVM_CXX) $(LLVM_CFLAGS) $< -o $@
+%.bc: %.cc
+	$(LLVM_CXX) $(LLVM_CFLAGS) $< -o $@
+
+# bc to ll
+%.ll: %.bc
+	$(LLVM_DIS) $^
+
+# Merge files into one bc file
+$(PLAIN).bc: $(OBJFILES_BC)
+	$(LLVM_LINK) $(LLVM_LINK_FLAGS) $^ -o $@
+
+# Canonicalize file
+$(CANON).bc: $(PLAIN).bc
+	$(LLVM_OPT) $< $(CANON_OPTS) -o $@
+
+# Optimize once again (because of unrolling)
+$(CANON_OPTI).bc: $(CANON).bc
+	$(LLVM_OPT) $< $(FINAL_OPTS) -o $@
+
+# Instrument file with BB/edge profiler
+$(PROF).bc: $(CANON).bc $(PROF_LIB)
+	$(LLVM_OPT) $< $(PROF_LIBS) $(PROF_OPTS) -o $@
+
+# Instrument file with only BB profiler - for grading
+$(BB_PROF).bc: $(CANON).bc $(PROF_LIB)
+	$(LLVM_OPT) $< $(PROF_LIBS) -bb-profiler -o $@
+
+# Instrument file with only edge profiler - for grading
+$(EDGE_PROF).bc: $(CANON).bc $(PROF_LIB)
+	$(LLVM_OPT) $< $(PROF_LIBS) -edge-profiler -o $@
+
+# Print profiling result
+prof_dump.txt: $(CANON).bc $(PROF).out $(PROF_LIB)
+	$(LLVM_OPT) $< $(PROF_LIBS) $(PROF_PRINT_OPTS) -disable-output
+
+# Print only BB profiling result - for grading
+prof_dump.bb.txt: $(CANON).bc $(BB_PROF).out $(PROF_LIB)
+	$(LLVM_OPT) $< $(PROF_LIBS) -bb-profile-loader -profile-printer -dump-bb-info -profile-printer-dump-file=$@ -disable-output
+
+# Print only edge profiling result - for grading
+prof_dump.edge.txt: $(CANON).bc $(EDGE_PROF).out $(PROF_LIB)
+	$(LLVM_OPT) $< $(PROF_LIBS) -edge-profile-loader -profile-printer -dump-edge-info -profile-printer-dump-file=$@ -disable-output
+
+# Superblock formation
+$(SB).bc: $(CANON).bc $(PROF).out $(SB_LIB)
+	$(LLVM_OPT) $< $(SB_LIBS) $(SB_OPTS) -o $@
+
+# Instrument superblock-formed file with BB/edge profiler
+$(SB_PROF).bc: $(SB).bc $(PROF_LIB)
+	$(LLVM_OPT) $< $(PROF_LIBS) $(PROF_OPTS) -bb-info-output-file=bb_info.sb.prof -edge-info-output-file=edge_info.sb.prof -o $@
+
+# Print profiling result
+prof_dump.sb.txt: $(SB).bc $(SB_PROF).out $(PROF_LIB)
+	$(LLVM_OPT) $< $(PROF_LIBS) $(PROF_PRINT_OPTS) -bb-info-input-file=bb_info.sb.prof -edge-info-input-file=edge_info.sb.prof -profile-printer-dump-file=$@ -disable-output
+
+# Optimize once again after superbloc formation
+$(SB_OPTI).bc: $(SB).bc
+	$(LLVM_OPT) $< $(FINAL_OPTS) -o $@
+
+# Link a bc file into an executable
+%.exe: %.bc
+	$(LLVM_CC) -lm -lstdc++ $(LDFLAGS) $^ -o $@
+
+# Plain merging test
+$(PLAIN).out: $(PLAIN).exe
+	@echo
+	@echo "**" $(PLAIN).exe testing...
+	rm -f $@ $(RESULT_FILE)
+	$(SETUP)
+	./$(PLAIN).exe $(PROF_ARGS) > $@
+	ln -s $@ $(RESULT_FILE)
+	$(PROF_CHECK)
+	rm -f $(RESULT_FILE)
+	$(CLEANUP)
+	@echo
+
+# Canonicalization test
+$(CANON).out: $(CANON).exe
+	@echo
+	@echo "**" $(CANON).exe testing...
+	rm -f $@ $(RESULT_FILE)
+	$(SETUP)
+	./$(CANON).exe $(PROF_ARGS) > $@
+	ln -s $@ $(RESULT_FILE)
+	$(PROF_CHECK)
+	rm -f $(RESULT_FILE)
+	$(CLEANUP)
+	@echo
+
+# Canonicalization test
+$(CANON_OPTI).out: $(CANON_OPTI).exe
+	@echo
+	@echo "**" $(CANON_OPTI).exe testing...
+	rm -f $@ $(RESULT_FILE)
+	$(SETUP)
+	./$(CANON_OPTI).exe $(PROF_ARGS) > $@
+	ln -s $@ $(RESULT_FILE)
+	$(PROF_CHECK)
+ifeq ($(AS_NO), 6)
+	rm -f $(RESULT_FILE)
+	$(TIME) ./$(CANON_OPTI).exe $(TEST_ARGS) > $@ 2> $(CANON_OPTI).time
+	ln -s $@ $(RESULT_FILE)
+	$(TEST_CHECK)
+endif
+	rm -f $(RESULT_FILE)
+	$(CLEANUP)
+	@echo
+
+# Instrumentation test
+$(PROF).out: $(PROF).exe
+	@echo
+	@echo "**" $(PROF).exe testing...
+	rm -f $@ $(RESULT_FILE)
+	$(SETUP)
+	./$(PROF).exe $(PROF_ARGS) > $@
+	ln -s $@ $(RESULT_FILE)
+	$(PROF_CHECK)
+	rm -f $(RESULT_FILE)
+	$(CLEANUP)
+	@echo
+
+# Instrumentation test
+$(BB_PROF).out: $(BB_PROF).exe
+	@echo
+	@echo "**" $(BB_PROF).exe testing...
+	rm -f $@ $(RESULT_FILE)
+	$(SETUP)
+	./$(BB_PROF).exe $(PROF_ARGS) > $@
+	ln -s $@ $(RESULT_FILE)
+	$(PROF_CHECK)
+	rm -f $(RESULT_FILE)
+	$(CLEANUP)
+	@echo
+
+# Instrumentation test
+$(EDGE_PROF).out: $(EDGE_PROF).exe
+	@echo
+	@echo "**" $(EDGE_PROF).exe testing...
+	rm -f $@ $(RESULT_FILE)
+	$(SETUP)
+	./$(EDGE_PROF).exe $(PROF_ARGS) > $@
+	ln -s $@ $(RESULT_FILE)
+	$(PROF_CHECK)
+	rm -f $(RESULT_FILE)
+	$(CLEANUP)
+	@echo
+
+# Superblock formation test
+$(SB).out: $(SB).exe
+	@echo
+	@echo "**" $(SB).exe testing...
+	rm -f $@ $(RESULT_FILE)
+	$(SETUP)
+	./$(SB).exe $(PROF_ARGS) > $@
+	ln -s $@ $(RESULT_FILE)
+	$(PROF_CHECK)
+	rm -f $(RESULT_FILE)
+	$(CLEANUP)
+	@echo
+
+# Superblock instrumentation test
+# We don't need to instrument superblock-formed code in this assignment for
+# optimization. This is just for grading.
+$(SB_PROF).out: $(SB_PROF).exe
+	@echo
+	@echo "**" $(SB_PROF).exe testing...
+	rm -f $@ $(RESULT_FILE)
+	$(SETUP)
+	./$(SB_PROF).exe $(PROF_ARGS) > $@
+	ln -s $@ $(RESULT_FILE)
+	$(PROF_CHECK)
+	rm -f $(RESULT_FILE)
+	$(CLEANUP)
+	@echo
+
+# Final test: optimized code after superblock formation
+$(SB_OPTI).out: $(SB_OPTI).exe
+	@echo
+	@echo "**" $(SB_OPTI).exe testing...
+	rm -f $@ $(RESULT_FILE)
+	$(SETUP)
+	$(TIME) ./$(SB_OPTI).exe $(TEST_ARGS) > $@ 2> $(SB_OPTI).time
+	ln -s $@ $(RESULT_FILE)
+	$(TEST_CHECK)
+	rm -f $(RESULT_FILE)
+	$(CLEANUP)
+	@echo
+
+clean:
+	rm -f *.o *.ll *.bc *.exe *.time *.out *.prof prof_dump*.txt $(RESULT_FILE)
+	$(CLEANUP)
+
+# Don't delete any intermediate files (they might be useful for debugging)
+.SECONDARY:

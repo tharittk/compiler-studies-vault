@@ -1,0 +1,562 @@
+
+conflicts: 2 shift/reduce, 5 reduce/reduce
+# define TIDENT 257
+# define TUINT 258
+# define TUREAL 259
+# define TSTRING 260
+# define TCHAR 261
+# define TARRAY 262
+# define TBEGIN 263
+# define TCASE 264
+# define TCONST 265
+# define TDO 266
+# define TDOWNTO 267
+# define TELSE 268
+# define TEND 269
+# define TFILE 270
+# define TFOR 271
+# define TFORWARD 272
+# define TFUNCTION 273
+# define TGOTO 274
+# define TIF 275
+# define TLABEL 276
+# define TNEW 277
+# define TNIL 278
+# define TNOT 279
+# define TOF 280
+# define TPACKED 281
+# define TPROCEDURE 282
+# define TPROGRAM 283
+# define TREAD 284
+# define TREADLN 285
+# define TRECORD 286
+# define TREPEAT 287
+# define TSET 288
+# define TTHEN 289
+# define TTO 290
+# define TTYPE 291
+# define TUNTIL 292
+# define TVAR 293
+# define TWHILE 294
+# define TWITH 295
+# define TWRITE 296
+# define TWRITELN 297
+# define TRELOP 298
+# define TADDOP 299
+# define TMULOP 300
+# define TSEMI 301
+# define TCOLON 302
+# define TASGN 303
+# define TCARET 304
+# define TDOT 305
+# define TDOTDOT 306
+# define TCOMMA 307
+# define TLPAREN 308
+# define TRPAREN 309
+# define TLBRACK 310
+# define TRBRACK 311
+# define TERROR 312
+
+# line 20 "pascal.y"
+
+#define _IN_LEX_ 
+
+#include "IIa.h" 
+#include "predefined.h" 
+#include "error.msg" 
+
+#define yyclearin yychar = -1
+#define yyerrok yyerrflag = 0
+extern int yychar;
+extern short yyerrflag;
+#ifndef YYMAXDEPTH
+#define YYMAXDEPTH 150
+#endif
+#ifndef YYSTYPE
+#define YYSTYPE int
+#endif
+YYSTYPE yylval, yyval;
+# define YYERRCODE 256
+
+# line 300 "pascal.y"
+ 
+
+#include "lex.++.c" 
+short yyexca[] ={
+-1, 1,
+	0, -1,
+	-2, 0,
+-1, 71,
+	306, 8,
+	-2, 17,
+-1, 83,
+	303, 25,
+	304, 25,
+	310, 25,
+	-2, 90,
+-1, 152,
+	298, 92,
+	299, 92,
+	300, 92,
+	-2, 52,
+-1, 162,
+	307, 85,
+	309, 85,
+	-2, 92,
+-1, 180,
+	298, 0,
+	-2, 35,
+	};
+# define YYNPROD 106
+# define YYLAST 441
+short yyact[]={
+
+   4,  61, 194,  62,  60,  72,   4, 107, 176, 164,
+ 108,   4, 107, 169, 160, 108,   4, 107, 123, 154,
+ 108, 170,   4, 107, 124, 101, 108, 109, 110, 146,
+ 144, 145, 109, 110, 146, 144, 145, 109, 110, 192,
+ 190, 201,  64, 109, 110, 183, 191,  68,  64, 123,
+ 149,  69, 120,  64, 189, 124, 119, 114,  64, 192,
+ 116, 193, 114, 118,  64,   4,  61, 114,  62,  60,
+ 123, 117, 123, 114,  25, 188, 124, 187, 124, 130,
+   9, 131,   8, 215, 204, 198,  89,  54, 205, 205,
+ 197,   4,  53, 100,   5, 151, 129,  85,  77,   4,
+  61, 143,  62,  60, 214, 202, 165,  64, 102,  86,
+ 199,  79, 195, 146, 144, 145,  69, 125,  80, 146,
+ 144, 145, 144, 145,  18,  29,  27,  26,  76,  10,
+  81,  82, 145, 146, 144, 145,  44, 203, 103,   4,
+ 103,  64,   4, 128, 105,   2,  31, 200, 137,   4,
+  21, 185,  23, 172,   4,  61,  35,  62,  60, 161,
+ 112, 127,  12,   3, 113,  34,   7,  74,  58,  65,
+  11,  73,  66,  21,  14,  23,  19,  36,  23,  28,
+  88,  48,  30,  16,  38,  22,  20,  39,  41,  13,
+  38,  84, 111,  33,  51,  50,  52,  32,  70,  49,
+ 126,  40,  24, 171,  63,   6,  45,  46,  71,  83,
+ 184,  42, 136,  87,  92,  71,  63,  71,  24,  24,
+  63,  24, 104,  75,  93,  43,  95, 166,  96,  97,
+  99, 142,  91, 141, 140,  78,  59,  37, 133,  67,
+  59,  90,  57,  90,  98,  17,  83,  59,  59,  59,
+  87,  15,   1,   0,  94,   0,  47, 121,   0,   0,
+   0,  63,  71,   0,  83,  55,  83,  56,  87,   0,
+  87, 135,   0, 139, 134,   0,   0,   0, 156, 156,
+   0, 152, 155, 157, 158, 162,   0,   0, 168, 173,
+ 174, 175,   0,  59,  59,   0, 138, 163,  83, 132,
+   0,   0,  87,   0,  83, 177,   0,   0,  87, 182,
+   0, 181,  63,   0, 162,   0,   0,  24,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+   0, 196,   0,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,  59,   0,   0,   0,   0,   0,
+ 186, 207, 206,   0,   0, 211,   0, 162, 173, 208,
+   0,  71, 209,   0,  63,  83,  63,   0,   0,  87,
+ 210,   0, 212,   0, 106, 115,  83,   0,   0,   0,
+  87,   0,   0, 216, 122,   0,   0,   0,   0,   0,
+   0,  24,   0,  59,   0,   0,  59,   0,  59,   0,
+   0,   0, 186,   0, 213,   0,   0,   0, 147, 148,
+   0,   0, 150,   0, 153,   0,   0, 159,   0,   0,
+   0,   0, 167,   0,   0,   0,   0,   0,   0,   0,
+   0,   0,   0,   0,   0,   0,   0,   0, 178, 179,
+ 180 };
+short yypact[]={
+
+-138,-1000,-108,-214,-1000,-108,-227,-1000,-172,-108,
+-141,-1000,-231,-1000,-1000,-174,-1000,-175,-108,-1000,
+-176,-108,-117,-108,-1000,-1000,-118,-115,-162,-108,
+-162,-1000,-1000,-1000,-108,-108,-1000,-215,-1000,-162,
+-1000,-162,-1000,-158,-1000,-1000,-1000,-257,-166,-222,
+-1000,-222,-1000,-108,-257,-158,-257,-1000,-1000,-103,
+-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-108,-108,
+-213,-1000,-285,-161,-1000,-145,-235,-235,-243,-237,
+-245,-252,-1000,-256,-1000,-166,-235,-286,-184,-150,
+-1000,-206,-1000,-1000,-1000,-1000,-1000,-1000,-228,-1000,
+-158,-192,-1000,-166,-120,-166,-165,-1000,-1000,-1000,
+-235,-235,-258,-286,-235,-185,-241,-108,-108,-246,
+-251,-163,-179,-1000,-235,-141,-288,-1000,-108,-108,
+-108,-1000,-1000,-303,-1000,-1000,-1000,-166,-1000,-1000,
+-235,-235,-235,-166,-1000,-1000,-1000,-1000,-168,-251,
+-264,-158,-286,-179,-1000,-232,-1000,-234,-255,-269,
+-263,-248,-286,-179,-1000,-1000,-309,-179,-189,-150,
+-1000,-1000,-217,-1000,-191,-1000,-133,-1000,-168,-1000,
+-177,-1000,-268,-1000,-164,-218,-1000,-1000,-1000,-1000,
+-1000,-1000,-251,-1000,-1000,-1000,-1000,-108,-108,-141,
+-257,-1000,-1000,-158,-166,-158,-1000,-1000,-1000,-197,
+-1000,-219,-1000,-1000,-1000,-166,-1000 };
+short yypgo[]={
+
+   0, 252, 160, 168, 198, 251, 225, 192, 245, 169,
+ 172, 244, 239, 238, 237, 177, 164, 235, 297, 234,
+ 233, 231, 227, 167, 223, 222, 212, 191, 210, 151,
+ 205, 162, 153, 203, 161, 200, 199, 197, 180, 194,
+ 193, 189, 174, 183, 176, 186, 185, 181, 171, 159 };
+short yyr1[]={
+
+   0,   2,   3,   3,   3,   4,   5,   5,   3,   4,
+   8,   8,   9,  11,  11,  10,  10,  10,   9,   9,
+  13,  12,  14,  14,  15,  16,  17,  18,  18,  18,
+  19,  20,  21,  18,  18,  18,  18,  18,  22,  16,
+  16,  23,  24,  25,  26,  26,  23,  23,  28,  28,
+  29,  29,  23,  23,  23,   1,  30,  30,  23,  23,
+  23,  23,  23,  23,  32,  32,  33,  34,  35,  35,
+  36,  37,  39,  40,  38,  38,  31,  41,  41,  42,
+  42,  43,  43,  47,  44,  49,  49,  49,  49,  23,
+  23,  18,  18,   6,  45,  45,  18,  23,  23,  48,
+  48,   7,  46,  46,  46,  27 };
+short yyr2[]={
+
+   0,   1,   1,   1,   1,   1,   4,   5,   1,   2,
+   4,   5,   1,   1,   3,   3,   3,   1,   1,   2,
+   1,   6,   1,   3,   3,   1,   1,   1,   1,   1,
+   1,   1,   1,   3,   3,   3,   2,   2,   1,   2,
+   4,   3,   2,   2,   2,   1,   4,   5,   3,   5,
+   1,   3,   3,   3,   3,   8,   1,   3,   4,   4,
+   4,   4,   4,   1,   1,   3,   3,   2,   1,   3,
+   1,   6,   1,   8,   3,   1,   1,   1,   3,   1,
+   3,   1,   3,   0,   5,   1,   1,   1,   3,   4,
+   1,   4,   1,   1,   2,   3,   3,   1,   3,   1,
+   3,   1,   1,   2,   2,   0 };
+short yychk[]={
+
+-1000,  -1, 283,  -2, 257, 308, -30,  -2, 309, 307,
+ 301,  -2, -31, -41, -42,  -5, -43,  -8, 265, -44,
+ -45, 291, -46, 293, -27, 305, 301, 301,  -2, 301,
+  -2, 263, -37, -40, 282, 273, -15, -14,  -2,  -2,
+ -42,  -2, -43,  -6, 298, -44, -15,  -6, -47, -36,
+  -2, -39,  -2, 307, 302,  -6,  -6,  -4,  -3,  -7,
+ 261, 258, 260,  -2, 299,  -9, -10, -12, 304, 308,
+  -4,  -2, 262, -48, -23, -24, 294, 264, -17, 277,
+ 284, 296, 297,  -2, -27, 263, 275, -16, -38, 308,
+ -27, -38,  -2,  -9,  -4,  -9,  -3,  -2, -11,  -2,
+ 306, 310, 269, 301, -25, 289, -18, 258, 261, 278,
+ 279,  -7,  -2, -16, 308, -18, 303, 308, 308, 308,
+ 308, -48, -18, 304, 310, 301, -35, -34, 293, 302,
+ 307, 309,  -4, -13, -10, -23, -26, 268, -27, -23,
+ -19, -20, -21, 266, 299, 300, 298, -18, -18, 308,
+ -18, 280, -16, -18, 260, -16,  -2, -16, -16, -18,
+ 260, -49, -16, -18, 260, 269, -22, -18, -31, 301,
+ 309, -33, -32,  -2,  -2,  -2, 311, -23, -18, -18,
+ -18, -23, -49, 309, -28, -29,  -4, 309, 309, 309,
+ 309, 309, 307, 309, 311, 301, -34, 307, 302, 301,
+ 280, 309, 269, 301, 302, 307, -49, -32,  -2, -31,
+  -9, -29, -23,  -4, 301, 302, -23 };
+short yydef[]={
+
+   0,  -2,   0,   0,   1,   0,   0,  56,   0,   0,
+ 105,  57,   0,  76,  77,   0,  79,   0,   0,  81,
+   0,   0,   0,   0, 102,  55, 105, 105,   0, 105,
+   0,  83, 103, 104,   0,   0,  94,   0,  22,   0,
+  78,   0,  80,   0,  93,  82,  95,   0, 105, 105,
+  70, 105,  72,   0,   0,   0,   0,   6,   5,   0,
+   2,   3,   4,   8, 101,  10,  12,  18,   0,   0,
+   0,  -2,   0,   0,  99,   0,   0,   0,   0,   0,
+   0,   0,  63,  -2,  97, 105,   0,  26,   0,   0,
+  75,   0,  23,  24,   7,  11,   9,  19,   0,  13,
+   0,   0,  84, 105, 105, 105,   0,  27,  28,  29,
+   0,   0,  25,  92,   0,   0,   0,   0,   0,   0,
+   0,   0,  42,  39,   0, 105,   0,  68,   0,   0,
+   0,  15,  16,   0,  20, 100,  41, 105,  45,  43,
+   0,   0,   0, 105,  30,  31,  32,  36,  37,   0,
+   0,   0,  -2,  53,  54,   0,  25,   0,  92,   0,
+   0,   0,  -2,  86,  87,  98,   0,  38,   0,   0,
+  74,  67,   0,  64,   0,  14,   0,  44,  33,  34,
+  -2,  46,   0,  96,   0,   0,  50,  58,  59,  60,
+  61,  62,   0,  89,  40,  71,  69,   0,   0, 105,
+   0,  91,  47,   0, 105,   0,  88,  65,  66,   0,
+  21,   0,  48,  51,  73, 105,  49 };
+#ifndef lint
+static	char yaccpar_sccsid[] = "@(#)yaccpar 1.1 86/09/25 SMI"; /* from UCB 4.1 83/02/11 */
+#endif
+
+#
+# define YYFLAG -1000
+# define YYERROR goto yyerrlab
+# define YYACCEPT return(0)
+# define YYABORT return(1)
+
+/*	parser for yacc output	*/
+
+#ifdef YYDEBUG
+int yydebug = 0; /* 1 for debugging */
+#endif
+YYSTYPE yyv[YYMAXDEPTH]; /* where the values are stored */
+int yychar = -1; /* current input token number */
+int yynerrs = 0;  /* number of errors */
+short yyerrflag = 0;  /* error recovery flag */
+
+yyparse() {
+
+	short yys[YYMAXDEPTH];
+	short yyj, yym;
+	register YYSTYPE *yypvt;
+	register short yystate, *yyps, yyn;
+	register YYSTYPE *yypv;
+	register short *yyxi;
+
+	yystate = 0;
+	yychar = -1;
+	yynerrs = 0;
+	yyerrflag = 0;
+	yyps= &yys[-1];
+	yypv= &yyv[-1];
+
+ yystack:    /* put a state and value onto the stack */
+
+#ifdef YYDEBUG
+	if( yydebug  ) printf( "state %d, char 0%o\n", yystate, yychar );
+#endif
+		if( ++yyps>= &yys[YYMAXDEPTH] ) { yyerror( "yacc stack overflow" ); return(1); }
+		*yyps = yystate;
+		++yypv;
+		*yypv = yyval;
+
+ yynewstate:
+
+	yyn = yypact[yystate];
+
+	if( yyn<= YYFLAG ) goto yydefault; /* simple state */
+
+	if( yychar<0 ) if( (yychar=yylex())<0 ) yychar=0;
+	if( (yyn += yychar)<0 || yyn >= YYLAST ) goto yydefault;
+
+	if( yychk[ yyn=yyact[ yyn ] ] == yychar ){ /* valid shift */
+		yychar = -1;
+		yyval = yylval;
+		yystate = yyn;
+		if( yyerrflag > 0 ) --yyerrflag;
+		goto yystack;
+		}
+
+ yydefault:
+	/* default state action */
+
+	if( (yyn=yydef[yystate]) == -2 ) {
+		if( yychar<0 ) if( (yychar=yylex())<0 ) yychar = 0;
+		/* look through exception table */
+
+		for( yyxi=yyexca; (*yyxi!= (-1)) || (yyxi[1]!=yystate) ; yyxi += 2 ) ; /* VOID */
+
+		while( *(yyxi+=2) >= 0 ){
+			if( *yyxi == yychar ) break;
+			}
+		if( (yyn = yyxi[1]) < 0 ) return(0);   /* accept */
+		}
+
+	if( yyn == 0 ){ /* error */
+		/* error ... attempt to resume parsing */
+
+		switch( yyerrflag ){
+
+		case 0:   /* brand new error */
+
+			yyerror( "syntax error" );
+		yyerrlab:
+			++yynerrs;
+
+		case 1:
+		case 2: /* incompletely recovered error ... try again */
+
+			yyerrflag = 3;
+
+			/* find a state where "error" is a legal shift action */
+
+			while ( yyps >= yys ) {
+			   yyn = yypact[*yyps] + YYERRCODE;
+			   if( yyn>= 0 && yyn < YYLAST && yychk[yyact[yyn]] == YYERRCODE ){
+			      yystate = yyact[yyn];  /* simulate a shift of "error" */
+			      goto yystack;
+			      }
+			   yyn = yypact[*yyps];
+
+			   /* the current yyps has no shift onn "error", pop stack */
+
+#ifdef YYDEBUG
+			   if( yydebug ) printf( "error recovery pops state %d, uncovers %d\n", *yyps, yyps[-1] );
+#endif
+			   --yyps;
+			   --yypv;
+			   }
+
+			/* there is no state on the stack with an error shift ... abort */
+
+	yyabort:
+			return(1);
+
+
+		case 3:  /* no shift yet; clobber input char */
+
+#ifdef YYDEBUG
+			if( yydebug ) printf( "error recovery discards char %d\n", yychar );
+#endif
+
+			if( yychar == 0 ) goto yyabort; /* don't discard EOF, quit */
+			yychar = -1;
+			goto yynewstate;   /* try again in the same state */
+
+			}
+
+		}
+
+	/* reduction by production yyn */
+
+#ifdef YYDEBUG
+		if( yydebug ) printf("reduce %d\n",yyn);
+#endif
+		yyps -= yyr2[yyn];
+		yypvt = yypv;
+		yypv -= yyr2[yyn];
+		yyval = yypv[1];
+		yym=yyn;
+			/* consult goto table to find next state */
+		yyn = yyr1[yyn];
+		yyj = yypgo[yyn] + *yyps + 1;
+		if( yyj>=YYLAST || yychk[ yystate = yyact[yyj] ] != -yyn ) yystate = yyact[yypgo[yyn]];
+		switch(yym){
+			
+case 1:
+# line 32 "pascal.y"
+{ Sstack.push(yylval); } break;
+case 2:
+# line 35 "pascal.y"
+{ Sstack.push(yylval); 
+		  Sstack.push(INTEGER_CONST_ID); } break;
+case 3:
+# line 39 "pascal.y"
+{ Sstack.push(yylval); 
+		  Sstack.push(INTEGER_CONST_ID); } break;
+case 4:
+# line 43 "pascal.y"
+{ Sstack.push(strings_table.name(yylval)); 
+		  Sstack.push(STRING_CONST_ID);} break;
+case 6:
+# line 49 "pascal.y"
+{ Properties	*Const; 
+		  switch(Sstack.ID_pop()) { 
+		    case INTEGER_CONST_ID: 
+			Const = new INTEGER_CONST(Sstack.int_pop());  
+			break; 
+		    case STRING_CONST_ID: 
+			Const = new STRING_CONST(Sstack.char_pop());  
+			break; 
+		    default: 
+			yyerror("unresolvable constant"); 
+			exit(1); 
+		  } 
+		  symbol_table[Sstack.int_pop()]->insert(Const);  
+		} break;
+case 7:
+# line 65 "pascal.y"
+{ Properties	*Const; 
+		  switch(Sstack.ID_pop()) { 
+		    case INTEGER_CONST_ID: 
+			Const = new INTEGER_CONST(Sstack.int_pop());  
+			break; 
+		    case STRING_CONST_ID: 
+			Const = new STRING_CONST(Sstack.char_pop());  
+			break; 
+		    default: 
+			yyerror("unresolvable constant"); 
+			exit(1); 
+		  } 
+		  symbol_table[Sstack.int_pop()]->insert(Const);  
+		} break;
+case 8:
+# line 81 "pascal.y"
+{ 
+	  Properties *test = symbol_table[Sstack.int_pop()]->get();  
+	  if (test == NULL) { 
+		yyerror(EMS_id2const); 
+		exit(1); 
+	  } 
+	  else { 
+	 	test ->decompose_const(Sstack);
+	  } 
+	} break;
+case 9:
+# line 93 "pascal.y"
+{ 
+	  if (Sstack.ID_pop() == INTEGER_CONST_ID) { 
+	  	Sstack.push(-(Sstack.int_pop())); 
+		Sstack.push(INTEGER_CONST_ID); 
+	  } 
+	  else { 
+		yyerror("inappropriate constant"); 
+		exit(1); 
+	  } 
+	} break;
+case 10:
+# line 105 "pascal.y"
+{ TYPE	*Type = new TYPE(Sstack.type_pop()); 
+	  symbol_table[Sstack.int_pop()]->insert(Type);  
+	} break;
+case 11:
+# line 110 "pascal.y"
+{ TYPE	*Type = new TYPE(Sstack.type_pop()); 
+	  symbol_table[Sstack.int_pop()]->insert(Type);  
+	} break;
+case 13:
+# line 117 "pascal.y"
+{ Sstack.push(0); } break;
+case 14:
+# line 120 "pascal.y"
+{ int index = Sstack.int_pop(); 
+	  int n     = Sstack.int_pop() + 1; 
+	  Sstack.push(index); 
+	  Sstack.push(n); 
+	} break;
+case 15:
+# line 127 "pascal.y"
+{ int n = Sstack.int_pop(); 
+	  SCALAR *Enum = new SCALAR(n);  
+	  for(int i=n ; i>=0; i--) { 
+	    int index = Sstack.int_pop(); 
+	    Enum->const_id_list.insert(index); 
+	    symbol_table[index]->insert(new INTEGER_CONST(i));  
+	  }  
+	  Sstack.push(Enum); 
+	} break;
+case 16:
+# line 138 "pascal.y"
+{ int	n1,n2; 
+	  ID_KIND	id1,id2; 
+	  id2 = Sstack.ID_pop(); n2 = Sstack.int_pop(); 
+	  id1 = Sstack.ID_pop(); n1 = Sstack.int_pop(); 
+	  if ((id1 == STRING_CONST_ID) || (id2 == STRING_CONST_ID)) { 
+		yyerror("inappropriate constants for a subrange"); 
+	  } 
+	  else { 
+	  Sstack.push(new SUBRANGE(n1,n2));  
+	  } 
+	} break;
+case 17:
+# line 151 "pascal.y"
+{ 
+	  Properties *test = symbol_table[Sstack.int_pop()]->get();  
+	  if (test == NULL) { 
+		test = Predefined_Boolean; 
+		yyerror(EMS_id2type); 
+	  } 
+	  Sstack.push(test->release_type());  
+	} break;
+case 19:
+# line 163 "pascal.y"
+{ 
+	  Properties *test = symbol_table[Sstack.int_pop()]->get();  
+	  if (test == NULL) { 
+		test = Predefined_Boolean; 
+		yyerror(EMS_id2type); 
+	  } 
+	  Sstack.push(new POINTER(test->release_type()));  
+	} break;
+case 21:
+# line 175 "pascal.y"
+{ TYPE_DESCR	*typer, *index_list; 
+	  typer = Sstack.type_pop(); 
+	  index_list = Sstack.type_pop(); 
+	  int space = index_list->number() * typer->Size(); 
+	  Sstack.push(new ARRAY(typer,index_list,space)); 
+	} break;
+case 83:
+# line 262 "pascal.y"
+{ symbol_table.Dump(cout); } break;
+		}
+		goto yystack;  /* stack new state and value */
+
+	}
