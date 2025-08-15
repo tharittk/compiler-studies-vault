@@ -1,0 +1,12 @@
+version: '2.3'
+
+services:
+    dev:
+        image: cscd70:2023S
+        build:
+            context: Assignment0-Introduction_to_Docker
+        volumes:
+            - .:/mnt
+        environment:
+            - CMAKE_EXPORT_COMPILE_COMMANDS=1
+        working_dir: /mnt
