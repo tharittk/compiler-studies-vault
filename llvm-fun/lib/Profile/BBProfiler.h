@@ -5,6 +5,7 @@
 #define FUN_PROFILE_BBPROFILER_H
 
 #include "llvm/Pass.h"
+#include <unordered_map>
 
 namespace fun {
 
@@ -25,6 +26,7 @@ public:
   void getAnalysisUsage(AnalysisUsage &au) const override {
     au.setPreservesCFG();
   }
+
 };
 
 }
