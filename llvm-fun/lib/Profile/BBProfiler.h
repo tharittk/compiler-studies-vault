@@ -14,8 +14,10 @@ using namespace llvm;
 class BBProfiler : public ModulePass {
 public:
   static char ID; // Pass identification, replacement for typeid
+  DenseMap<BasicBlock*, Value*> BBCounterMap;
 
   BBProfiler() : ModulePass(ID) {}
+  // BasicBlock To Integer Count
 
   bool runOnModule(Module &m);
 
