@@ -4,8 +4,8 @@
 #ifndef FUN_PROFILE_BBPROFILER_H
 #define FUN_PROFILE_BBPROFILER_H
 
+#include "llvm/IR/Value.h"
 #include "llvm/Pass.h"
-#include <unordered_map>
 
 namespace fun {
 
@@ -14,12 +14,12 @@ using namespace llvm;
 class BBProfiler : public ModulePass {
 public:
   static char ID; // Pass identification, replacement for typeid
-  DenseMap<BasicBlock*, Value*> BBCounterMap;
+  StringMap<Value *> BBCounterMap;
 
   BBProfiler() : ModulePass(ID) {}
   // BasicBlock To Integer Count
 
-  bool runOnModule(Module &m);
+  bool runOnModule(Module &m) override;
 
   virtual const char *getPassName() const override {
     return "Basic Block Profiler";
@@ -28,9 +28,8 @@ public:
   void getAnalysisUsage(AnalysisUsage &au) const override {
     au.setPreservesCFG();
   }
-
 };
 
-}
+} // namespace fun
 
 #endif

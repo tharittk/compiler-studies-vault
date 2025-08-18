@@ -2,7 +2,5 @@
 
 echo "Test all.func"
 ../Debug+Asserts/bin/codegen all.fun
-llc all.ll
-clang all.s -no-pie -o allt
-./allt
-rm allt
+opt -load ../Debug+Asserts/lib/Profile.so -bb-profiler -S -o all_opt.ll all.ll
+lli all_opt.ll
