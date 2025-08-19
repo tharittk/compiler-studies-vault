@@ -15,7 +15,6 @@
 using namespace llvm;
 using namespace fun;
 
-// TODO Set this number to the right value
 STATISTIC(numBBs, "The # of BBs profiled.");
 
 char BBProfiler::ID = 0;
@@ -38,8 +37,6 @@ GlobalVariable *CreateGlobalCounter(Module &m, StringRef VarName) {
   // NewGV->setAlignment(4);
   NewGV->setInitializer(ConstantInt::get(ctxt, APInt(32, 0)));
   return NewGV;
-  // return new GlobalVariable(m, Type::getInt32Ty(ctxt),/*isConstant*/false,
-  // GlobalValue::ExternalLinkage, ConstantInt::get(Type::getInt32Ty(ctxt), 0));
 }
 
 bool BBProfiler::runOnModule(Module &m) {
@@ -122,12 +119,9 @@ bool BBProfiler::runOnModule(Module &m) {
                                    LoadCounter}));
   }
 
-  //   Builder.CreateRetVoid();
-  //   appendToGlobalDtors(m, PrintfWrapperF, /*Priority=*/0);
+  appendToGlobalDtors(m, PrintfWrapperF, /*Priority=*/0);
 
-  // TODO: Actual write
-  //   Type *VoidTy = Type::getVoidTy(ctxt);
-  //   Type *i8PtrTy = PointerType::getUnqual(Type::getInt8Ty(ctxt));
+  // STEP 4.1: Write output to a file
   FunctionType *FopenType = FunctionType::get(
       Type::getInt8PtrTy(ctxt),
       ArrayRef<Type *>({Type::getInt8PtrTy(ctxt), Type::getInt8PtrTy(ctxt)}),
@@ -150,6 +144,12 @@ bool BBProfiler::runOnModule(Module &m) {
   Value *FileHandle =
       Builder.CreateCall(Fopen, ArrayRef<Value *>({Filename, Mode}));
 
+  Value *FormatHeaderStr = Builder.CreateGlobalStringPtr(
+      StringRef("Total Blocks:%d\n"), "format_str");
+  Value *NumBBsVal = ConstantInt::get(Type::getInt32Ty(ctxt), numBBs);
+  Value *Args[] = {FileHandle, FormatHeaderStr, NumBBsVal};
+
+  Builder.CreateCall(Ffprintf, Args);
   Value *FormatStr =
       Builder.CreateGlobalStringPtr(StringRef("%s:%d\n"), "format_str");
 
