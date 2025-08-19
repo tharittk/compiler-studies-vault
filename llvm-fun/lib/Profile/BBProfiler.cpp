@@ -78,9 +78,6 @@ bool BBProfiler::runOnModule(Module &m) {
   Function *Printf =
       dyn_cast<Function>(m.getOrInsertFunction("printf", PrintfTy));
 
-  if (Printf == nullptr)
-    std::cerr << "Printf Is NULL ! ";
-
   // STEP 3: Inject global variable that will hold printf's format string
   Constant *ResultFormatStr =
       ConstantDataArray::getString(ctxt, "%-20s %-10lu\n");
@@ -119,13 +116,56 @@ bool BBProfiler::runOnModule(Module &m) {
   for (auto &item : BBCounterMap) {
     LoadInst *LoadCounter =
         Builder.CreateLoad(item.getValue(), "ld_counter_print");
-    Builder.CreateCall(Printf, {ResultFormatStrPtr,
-                                Builder.CreateGlobalStringPtr(item.getKey()),
-                                LoadCounter});
+    Builder.CreateCall(
+        Printf, ArrayRef<Value *>({ResultFormatStrPtr,
+                                   Builder.CreateGlobalStringPtr(item.getKey()),
+                                   LoadCounter}));
   }
 
+  //   Builder.CreateRetVoid();
+  //   appendToGlobalDtors(m, PrintfWrapperF, /*Priority=*/0);
+
+  // TODO: Actual write
+  //   Type *VoidTy = Type::getVoidTy(ctxt);
+  //   Type *i8PtrTy = PointerType::getUnqual(Type::getInt8Ty(ctxt));
+  FunctionType *FopenType = FunctionType::get(
+      Type::getInt8PtrTy(ctxt),
+      ArrayRef<Type *>({Type::getInt8PtrTy(ctxt), Type::getInt8PtrTy(ctxt)}),
+      false);
+  FunctionType *FprintfType =
+      FunctionType::get(Type::getInt32Ty(ctxt), Type::getInt8PtrTy(ctxt), true);
+  FunctionType *FcloseType = FunctionType::get(Type::getInt32Ty(ctxt),
+                                               Type::getInt8PtrTy(ctxt), false);
+
+  Function *Fopen =
+      dyn_cast<Function>(m.getOrInsertFunction("fopen", FopenType));
+  Function *Ffprintf =
+      dyn_cast<Function>(m.getOrInsertFunction("fprintf", FprintfType));
+  Function *Fclose =
+      dyn_cast<Function>(m.getOrInsertFunction("fclose", FcloseType));
+
+  Value *Filename = Builder.CreateGlobalStringPtr(StringRef(outputFileName),
+                                                  "outfilename_str");
+  Value *Mode = Builder.CreateGlobalStringPtr(StringRef("w"), "mode_str");
+  Value *FileHandle =
+      Builder.CreateCall(Fopen, ArrayRef<Value *>({Filename, Mode}));
+
+  Value *FormatStr =
+      Builder.CreateGlobalStringPtr(StringRef("%s:%d\n"), "format_str");
+
+  for (auto &item : BBCounterMap) {
+    LoadInst *LoadCounter =
+        Builder.CreateLoad(item.getValue(), "ld_counter_print");
+
+    Builder.CreateCall(
+        Ffprintf,
+        ArrayRef<Value *>({FileHandle, FormatStr,
+                           Builder.CreateGlobalStringPtr(item.getKey()),
+                           LoadCounter}));
+  }
+
+  Builder.CreateCall(Fclose, FileHandle);
   Builder.CreateRetVoid();
   appendToGlobalDtors(m, PrintfWrapperF, /*Priority=*/0);
-
   return true;
 }
