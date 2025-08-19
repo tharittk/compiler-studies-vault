@@ -8,3 +8,6 @@ llvm-fun/config.status
 llvm-fun/configure.out
 llvm-fun/Makefile.common
 llvm-fun/Makefile.llvm.config
+*.ll*
+*.prof*
+*.s*

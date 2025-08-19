@@ -14,6 +14,9 @@ class BBProfileLoader : public ModulePass {
 public:
   static char ID; // Pass identification, replacement for typeid
 
+  DenseMap<uint64_t, std::string> BBToBBName;
+  StringMap<unsigned> BBNameToCount;
+
   BBProfileLoader() : ModulePass(ID) {}
   bool runOnModule(Module &m);
 
@@ -32,9 +35,8 @@ public:
 
 private:
   // TODO Add any member functions or variables here if you want to
-
 };
 
-}
+} // namespace fun
 
 #endif

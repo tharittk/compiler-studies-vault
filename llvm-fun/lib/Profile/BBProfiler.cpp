@@ -42,8 +42,6 @@ GlobalVariable *CreateGlobalCounter(Module &m, StringRef VarName) {
 bool BBProfiler::runOnModule(Module &m) {
   auto &ctxt = m.getContext();
 
-  std::cout << "Run BB Profile ! \n";
-
   IRBuilder<> Builder(ctxt);
   // STEP 1: Code Injection
   for (auto &F : m) {
@@ -99,7 +97,7 @@ bool BBProfiler::runOnModule(Module &m) {
       m.getOrInsertFunction("printf_wrapper", PrintfWrapperTy));
 
   if (PrintfWrapperF == nullptr)
-    std::cerr << "PRintfWrapperF is NULL !";
+    std::cerr << "PrintfWrapperF is NULL !";
   // Basic block for calling actual printf
   BasicBlock *RetBlock = BasicBlock::Create(ctxt, "enter", PrintfWrapperF);
   Builder.SetInsertPoint(RetBlock);
@@ -108,16 +106,16 @@ bool BBProfiler::runOnModule(Module &m) {
   Value *ResultFormatStrPtr =
       Builder.CreatePointerCast(ResultFormatStrVar, PrintfArgTy);
 
-  Builder.CreateCall(Printf, {ResultHeaderStrPtr});
+  //   Builder.CreateCall(Printf, {ResultHeaderStrPtr});
 
-  for (auto &item : BBCounterMap) {
-    LoadInst *LoadCounter =
-        Builder.CreateLoad(item.getValue(), "ld_counter_print");
-    Builder.CreateCall(
-        Printf, ArrayRef<Value *>({ResultFormatStrPtr,
-                                   Builder.CreateGlobalStringPtr(item.getKey()),
-                                   LoadCounter}));
-  }
+  //   for (auto &item : BBCounterMap) {
+  //     LoadInst *LoadCounter =
+  //         Builder.CreateLoad(item.getValue(), "ld_counter_print");
+  //     Builder.CreateCall(
+  //         Printf, ArrayRef<Value *>({ResultFormatStrPtr,
+  //                                    Builder.CreateGlobalStringPtr(item.getKey()),
+  //                                    LoadCounter}));
+  //   }
 
   appendToGlobalDtors(m, PrintfWrapperF, /*Priority=*/0);
 
@@ -145,11 +143,11 @@ bool BBProfiler::runOnModule(Module &m) {
       Builder.CreateCall(Fopen, ArrayRef<Value *>({Filename, Mode}));
 
   Value *FormatHeaderStr = Builder.CreateGlobalStringPtr(
-      StringRef("Total Blocks:%d\n"), "format_str");
+      StringRef("TotalBlocks:%d\n"), "format_str");
   Value *NumBBsVal = ConstantInt::get(Type::getInt32Ty(ctxt), numBBs);
-  Value *Args[] = {FileHandle, FormatHeaderStr, NumBBsVal};
+  Builder.CreateCall(
+      Ffprintf, ArrayRef<Value *>({FileHandle, FormatHeaderStr, NumBBsVal}));
 
-  Builder.CreateCall(Ffprintf, Args);
   Value *FormatStr =
       Builder.CreateGlobalStringPtr(StringRef("%s:%d\n"), "format_str");
 
