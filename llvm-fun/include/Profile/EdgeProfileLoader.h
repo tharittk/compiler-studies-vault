@@ -14,9 +14,12 @@ class EdgeProfileLoader : public ModulePass {
 public:
   static char ID; // Pass identification, replacement for typeid
 
-  typedef std::pair<const BasicBlock*, const BasicBlock*> Edge;
+  typedef std::pair<const BasicBlock *, const BasicBlock *> Edge;
 
   // Creates an Edge between two BasicBlocks.
+  DenseMap<uint64_t, std::string> EdgeToEdgeName;
+  StringMap<unsigned> EdgeNameToCount;
+
   static Edge getEdge(const BasicBlock *src, const BasicBlock *dest) {
     return Edge(src, dest);
   }
@@ -41,9 +44,8 @@ public:
 
 private:
   // TODO Add any member functions or variables here if you want to
-
 };
 
-}
+} // namespace fun
 
 #endif

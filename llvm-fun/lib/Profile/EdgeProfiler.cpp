@@ -57,7 +57,7 @@ bool EdgeProfiler::runOnModule(Module &m) {
         Builder.CreateStore(Inc, Var);
         ++numEdges;
 
-        std::cerr << "---Add Edge: " << EdgeName << std::endl;
+        // std::cerr << "---Add Edge: " << EdgeName << std::endl;
       } else if (NumSucc >= 2) {
         // if-else, conditional, or switch instrction
         // insert instruction at the top of successor block
@@ -78,7 +78,7 @@ bool EdgeProfiler::runOnModule(Module &m) {
           Builder.CreateStore(Inc, Var);
           ++EdgeIndex;
           ++numEdges;
-          std::cerr << "Add Edge: " << EdgeName << std::endl;
+          // std::cerr << "Add Edge: " << EdgeName << std::endl;
         }
       } else {
         //  Not handled in this scope

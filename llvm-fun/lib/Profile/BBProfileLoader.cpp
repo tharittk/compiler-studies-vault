@@ -27,8 +27,7 @@ static cl::opt<std::string> profileFileName(
     cl::desc("BB profile info file loaded by -bb-profile-loader"));
 
 uint64_t hashBB(const BasicBlock &BB) {
-  using namespace llvm;
-  llvm::hash_code HC = hash_value(BB.getParent()->getName());
+  hash_code HC = hash_value(BB.getParent()->getName());
   for (const auto &I : BB) {
     HC = hash_combine(HC, hash_value(I.getOpcode()));
   }
