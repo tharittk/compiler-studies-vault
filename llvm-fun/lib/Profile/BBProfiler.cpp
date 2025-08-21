@@ -8,7 +8,6 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
-// #include "llvm/Support/Alignment.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include <iostream>
 
@@ -26,26 +25,13 @@ static cl::opt<std::string>
                    cl::value_desc("filename"),
                    cl::desc("Output profile info file (used by -bb-profiler)"));
 
-GlobalVariable *CreateGlobalCounter(Module &m, StringRef VarName) {
-  auto &ctxt = m.getContext();
-  // declaration
-  Constant *NewGlobalVar =
-      m.getOrInsertGlobal(VarName, IntegerType::getInt32Ty(ctxt));
-  // definition
-  GlobalVariable *NewGV = m.getNamedGlobal(VarName);
-  NewGV->setLinkage(GlobalValue::CommonLinkage);
-  // NewGV->setAlignment(4);
-  NewGV->setInitializer(ConstantInt::get(ctxt, APInt(32, 0)));
-  return NewGV;
-}
-
 bool BBProfiler::runOnModule(Module &m) {
   auto &ctxt = m.getContext();
 
   IRBuilder<> Builder(ctxt);
   // STEP 1: Code Injection
   for (auto &F : m) {
-    int BBNum = 0; // BB numbering
+    unsigned BBNum = 0; // BB numbering
     for (auto &BB : F) {
       // Create global counter for each basic block
       // This must be a constant address because we basically
@@ -58,7 +44,7 @@ bool BBProfiler::runOnModule(Module &m) {
 
       Builder.SetInsertPoint(BB.getFirstNonPHI());
       // Load, inc, store
-      LoadInst *Load = Builder.CreateLoad(Var, "ld");
+      LoadInst *Load = Builder.CreateLoad(Var, "ld.block.count");
       Value *Inc = Builder.CreateAdd(Builder.getInt32(1), Load);
       Builder.CreateStore(Inc, Var);
       ++numBBs;

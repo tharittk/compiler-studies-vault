@@ -4,6 +4,7 @@
 #ifndef FUN_PROFILE_BBPROFILER_H
 #define FUN_PROFILE_BBPROFILER_H
 
+#include "ProfileUtils.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Pass.h"
 

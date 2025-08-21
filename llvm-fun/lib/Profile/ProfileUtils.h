@@ -3,5 +3,13 @@
 
 // TODO If you want to add some helper functions required from multiple
 // classes, do it here
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/Module.h"
 
+namespace fun {
+using namespace llvm;
+
+GlobalVariable *CreateGlobalCounter(Module &m, StringRef VarName);
+} // namespace fun
 #endif
