@@ -26,6 +26,8 @@ static cl::opt<std::string> outputFileName(
 
 bool EdgeProfiler::runOnModule(Module &m) {
   auto &ctxt = m.getContext();
+
+  // STEP 1:
   IRBuilder<> Builder(ctxt);
   for (auto &F : m) {
     unsigned BBNum = 0;
@@ -50,7 +52,7 @@ bool EdgeProfiler::runOnModule(Module &m) {
         GlobalVariable *Var = CreateGlobalCounter(m, EdgeName);
         EdgeCounterMap[StringRef(EdgeName)] = Var;
 
-        LoadInst *Load = Builder.CreateLoad(Var, "ld.egdge.count");
+        LoadInst *Load = Builder.CreateLoad(Var, "ld.edge.count");
         Value *Inc = Builder.CreateAdd(Builder.getInt32(1), Load);
         Builder.CreateStore(Inc, Var);
         ++numEdges;
@@ -66,6 +68,14 @@ bool EdgeProfiler::runOnModule(Module &m) {
                                  std::to_string(BBNum) + std::string("_E_") +
                                  std::to_string(EdgeIndex);
           Builder.SetInsertPoint((*succ)->getFirstNonPHI());
+
+          GlobalVariable *Var = CreateGlobalCounter(m, EdgeName);
+          EdgeCounterMap[StringRef(EdgeName)] = Var;
+
+          LoadInst *Load = Builder.CreateLoad(Var, "ld.edge.count");
+          Value *Inc = Builder.CreateAdd(Builder.getInt32(1), Load);
+
+          Builder.CreateStore(Inc, Var);
           ++EdgeIndex;
           ++numEdges;
           std::cerr << "Add Edge: " << EdgeName << std::endl;
@@ -77,6 +87,49 @@ bool EdgeProfiler::runOnModule(Module &m) {
 
       ++BBNum;
     }
+  }
+
+  // STEP 2: Write result to file
+  FunctionType *FopenType = FunctionType::get(
+      Type::getInt8PtrTy(ctxt),
+      ArrayRef<Type *>({Type::getInt8PtrTy(ctxt), Type::getInt8PtrTy(ctxt)}),
+      false);
+  FunctionType *FprintfType =
+      FunctionType::get(Type::getInt32Ty(ctxt), Type::getInt8PtrTy(ctxt), true);
+  FunctionType *FcloseType = FunctionType::get(Type::getInt32Ty(ctxt),
+                                               Type::getInt8PtrTy(ctxt), false);
+
+  Function *Fopen =
+      dyn_cast<Function>(m.getOrInsertFunction("fopen", FopenType));
+  Function *Ffprintf =
+      dyn_cast<Function>(m.getOrInsertFunction("fprintf", FprintfType));
+  Function *Fclose =
+      dyn_cast<Function>(m.getOrInsertFunction("fclose", FcloseType));
+
+  Value *Filename = Builder.CreateGlobalStringPtr(StringRef(outputFileName),
+                                                  "outfilename_str");
+  Value *Mode = Builder.CreateGlobalStringPtr(StringRef("w"), "mode_str");
+  Value *FileHandle =
+      Builder.CreateCall(Fopen, ArrayRef<Value *>({Filename, Mode}));
+
+  Value *FormatHeaderStr =
+      Builder.CreateGlobalStringPtr(StringRef("TotalEdges:%d\n"), "format_str");
+  Value *NumEdgesVal = ConstantInt::get(Type::getInt32Ty(ctxt), numEdges);
+  Builder.CreateCall(
+      Ffprintf, ArrayRef<Value *>({FileHandle, FormatHeaderStr, NumEdgesVal}));
+
+  Value *FormatStr =
+      Builder.CreateGlobalStringPtr(StringRef("%s:%d\n"), "format_str");
+
+  for (auto &item : EdgeCounterMap) {
+    LoadInst *LoadCounter =
+        Builder.CreateLoad(item.getValue(), "ld_counter_print");
+
+    Builder.CreateCall(
+        Ffprintf,
+        ArrayRef<Value *>({FileHandle, FormatStr,
+                           Builder.CreateGlobalStringPtr(item.getKey()),
+                           LoadCounter}));
   }
 
   return true;
