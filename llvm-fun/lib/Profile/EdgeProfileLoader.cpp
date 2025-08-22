@@ -83,6 +83,28 @@ bool EdgeProfileLoader::runOnModule(Module &m) {
   return false;
 }
 
-unsigned EdgeProfileLoader::getCount(const Edge &edge) const { return 11; }
+unsigned EdgeProfileLoader::getCount(const Edge &edge) const {
+  std::string EdgeName =
+      EdgeToEdgeName.lookup(hashEdge(*edge.first, *edge.second));
 
-double EdgeProfileLoader::getWeight(const Edge &edge) const { return 0.2; }
+  return EdgeNameToCount.lookup(EdgeName);
+}
+
+double EdgeProfileLoader::getWeight(const Edge &edge) const {
+
+  std::string EdgeName =
+      EdgeToEdgeName.lookup(hashEdge(*edge.first, *edge.second));
+
+  size_t pos = EdgeName.find("_E_");
+  std::string PrefixEdgeName = EdgeName.substr(0, pos + 3);
+  // get the count of over block that leaves this
+  unsigned Sum = 0;
+  const BasicBlock *src = edge.first;
+  unsigned EdgeIndex = 0;
+  for (auto succ = succ_begin(src); succ != succ_end(src); ++succ) {
+    std::string Name = PrefixEdgeName + std::to_string(EdgeIndex);
+    Sum += static_cast<double>(EdgeNameToCount.lookup(Name));
+    ++EdgeIndex;
+  }
+  return static_cast<double>(EdgeNameToCount.lookup(EdgeName)) / Sum;
+}
