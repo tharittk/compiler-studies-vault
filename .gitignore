@@ -11,3 +11,4 @@ llvm-fun/Makefile.llvm.config
 *.ll*
 *.prof*
 *.s*
+*clang+llvm-3.5.0*
