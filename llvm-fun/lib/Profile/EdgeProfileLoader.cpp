@@ -106,5 +106,7 @@ double EdgeProfileLoader::getWeight(const Edge &edge) const {
     Sum += static_cast<double>(EdgeNameToCount.lookup(Name));
     ++EdgeIndex;
   }
+  if (EdgeIndex == 0 || Sum == 0)
+    return 1.0;
   return static_cast<double>(EdgeNameToCount.lookup(EdgeName)) / Sum;
 }
