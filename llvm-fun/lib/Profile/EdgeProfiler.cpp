@@ -8,6 +8,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 #include <iostream>
 
 using namespace llvm;
@@ -88,6 +89,16 @@ bool EdgeProfiler::runOnModule(Module &m) {
       ++BBNum;
     }
   }
+  // TODO (tharitt): This is inserted at the print call block
+  FunctionType *PrintfWrapperTy =
+      FunctionType::get(Type::getVoidTy(ctxt), {}, false);
+  Function *PrintfWrapperF = dyn_cast<Function>(
+      m.getOrInsertFunction("printf_wrapper", PrintfWrapperTy));
+
+  if (PrintfWrapperF == nullptr)
+    std::cerr << "PrintfWrapperF is NULL !";
+  BasicBlock *RetBlock = BasicBlock::Create(ctxt, "enter", PrintfWrapperF);
+  Builder.SetInsertPoint(RetBlock);
 
   // STEP 2: Write result to file
   FunctionType *FopenType = FunctionType::get(
@@ -123,7 +134,7 @@ bool EdgeProfiler::runOnModule(Module &m) {
 
   for (auto &item : EdgeCounterMap) {
     LoadInst *LoadCounter =
-        Builder.CreateLoad(item.getValue(), "ld_counter_print");
+        Builder.CreateLoad(item.getValue(), "ld_counter_printE");
 
     Builder.CreateCall(
         Ffprintf,
@@ -131,6 +142,8 @@ bool EdgeProfiler::runOnModule(Module &m) {
                            Builder.CreateGlobalStringPtr(item.getKey()),
                            LoadCounter}));
   }
-
+  Builder.CreateCall(Fclose, FileHandle);
+  Builder.CreateRetVoid();
+  appendToGlobalDtors(m, PrintfWrapperF, /*Priority=*/0);
   return true;
 }

@@ -53,28 +53,29 @@ bool BBProfiler::runOnModule(Module &m) {
   }
 
   // STEP 2: Write result to file
-  PointerType *PrintfArgTy = PointerType::getUnqual(Type::getInt8Ty(ctxt));
-  FunctionType *PrintfTy = FunctionType::get(IntegerType::getInt32Ty(ctxt),
-                                             PrintfArgTy, /*IsVarArgs=*/true);
-  Function *Printf =
-      dyn_cast<Function>(m.getOrInsertFunction("printf", PrintfTy));
+  //   PointerType *PrintfArgTy = PointerType::getUnqual(Type::getInt8Ty(ctxt));
+  //   FunctionType *PrintfTy = FunctionType::get(IntegerType::getInt32Ty(ctxt),
+  //                                              PrintfArgTy,
+  //                                              /*IsVarArgs=*/true);
+  //   Function *Printf =
+  //       dyn_cast<Function>(m.getOrInsertFunction("printf", PrintfTy));
 
   // STEP 3: Inject global variable that will hold printf's format string
-  Constant *ResultFormatStr =
-      ConstantDataArray::getString(ctxt, "%-20s %-10lu\n");
-  Constant *ResultFormatStrVar =
-      m.getOrInsertGlobal("ResultFormatStrIR", ResultFormatStr->getType());
+  //   Constant *ResultFormatStr =
+  //       ConstantDataArray::getString(ctxt, "%-20s %-10lu\n");
+  //   Constant *ResultFormatStrVar =
+  //       m.getOrInsertGlobal("ResultFormatStrIR", ResultFormatStr->getType());
 
-  dyn_cast<GlobalVariable>(ResultFormatStrVar)->setInitializer(ResultFormatStr);
-  std::string out = "";
-  out += "=================================================\n";
-  out += "NAME                 #N CALLS\n";
-  out += "-------------------------------------------------\n";
+  //   dyn_cast<GlobalVariable>(ResultFormatStrVar)->setInitializer(ResultFormatStr);
+  //   std::string out = "";
+  //   out += "=================================================\n";
+  //   out += "NAME                 #N CALLS\n";
+  //   out += "-------------------------------------------------\n";
 
-  Constant *ResultHeaderStr = ConstantDataArray::getString(ctxt, out.c_str());
-  Constant *ResultHeaderStrVar =
-      m.getOrInsertGlobal("ResultHeaderStrIR", ResultHeaderStr->getType());
-  dyn_cast<GlobalVariable>(ResultHeaderStrVar)->setInitializer(ResultHeaderStr);
+  //   Constant *ResultHeaderStr = ConstantDataArray::getString(ctxt,
+  //   out.c_str()); Constant *ResultHeaderStrVar =
+  //       m.getOrInsertGlobal("ResultHeaderStrIR", ResultHeaderStr->getType());
+  //   dyn_cast<GlobalVariable>(ResultHeaderStrVar)->setInitializer(ResultHeaderStr);
 
   // STEP 4: Printf wrapper that will print the result
   FunctionType *PrintfWrapperTy =
@@ -87,10 +88,10 @@ bool BBProfiler::runOnModule(Module &m) {
   // Basic block for calling actual printf
   BasicBlock *RetBlock = BasicBlock::Create(ctxt, "enter", PrintfWrapperF);
   Builder.SetInsertPoint(RetBlock);
-  Value *ResultHeaderStrPtr =
-      Builder.CreatePointerCast(ResultHeaderStrVar, PrintfArgTy);
-  Value *ResultFormatStrPtr =
-      Builder.CreatePointerCast(ResultFormatStrVar, PrintfArgTy);
+  //   Value *ResultHeaderStrPtr =
+  //       Builder.CreatePointerCast(ResultHeaderStrVar, PrintfArgTy);
+  //   Value *ResultFormatStrPtr =
+  //       Builder.CreatePointerCast(ResultFormatStrVar, PrintfArgTy);
 
   //   Builder.CreateCall(Printf, {ResultHeaderStrPtr});
 
@@ -102,8 +103,6 @@ bool BBProfiler::runOnModule(Module &m) {
   //                                    Builder.CreateGlobalStringPtr(item.getKey()),
   //                                    LoadCounter}));
   //   }
-
-  appendToGlobalDtors(m, PrintfWrapperF, /*Priority=*/0);
 
   // STEP 4.1: Write output to a file
   FunctionType *FopenType = FunctionType::get(
@@ -139,7 +138,7 @@ bool BBProfiler::runOnModule(Module &m) {
 
   for (auto &item : BBCounterMap) {
     LoadInst *LoadCounter =
-        Builder.CreateLoad(item.getValue(), "ld_counter_print");
+        Builder.CreateLoad(item.getValue(), "ld_counter_printB");
 
     Builder.CreateCall(
         Ffprintf,
