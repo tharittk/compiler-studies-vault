@@ -96,17 +96,21 @@ double EdgeProfileLoader::getWeight(const Edge &edge) const {
       EdgeToEdgeName.lookup(hashEdge(*edge.first, *edge.second));
 
   size_t pos = EdgeName.find("_E_");
+
+  std::cout << "Look up name:" << EdgeName
+            << " get: " << static_cast<double>(EdgeNameToCount.lookup(EdgeName))
+            << "\n";
   std::string PrefixEdgeName = EdgeName.substr(0, pos + 3);
+  std::cout << "Prefix name: " << PrefixEdgeName << "\n";
   // get the count of over block that leaves this
   unsigned Sum = 0;
   const BasicBlock *src = edge.first;
   unsigned EdgeIndex = 0;
   for (auto succ = succ_begin(src); succ != succ_end(src); ++succ) {
     std::string Name = PrefixEdgeName + std::to_string(EdgeIndex);
-    Sum += static_cast<double>(EdgeNameToCount.lookup(Name));
     ++EdgeIndex;
   }
-  if (EdgeIndex == 0 || Sum == 0)
-    return 1.0;
+  if (Sum == 0)
+    return 0.0;
   return static_cast<double>(EdgeNameToCount.lookup(EdgeName)) / Sum;
 }

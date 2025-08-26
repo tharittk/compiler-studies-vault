@@ -8,6 +8,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include <iostream>
 
@@ -35,56 +36,75 @@ bool EdgeProfiler::runOnModule(Module &m) {
     for (auto &BB : F) {
       TerminatorInst *Terminator = BB.getTerminator();
 
-      if (dyn_cast<ReturnInst>(Terminator))
-        continue;
+      // if (dyn_cast<ReturnInst>(Terminator))
+      //   continue;
 
-      unsigned NumSucc = Terminator->getNumSuccessors();
+      // unsigned NumSucc = Terminator->getNumSuccessors();
 
-      if (NumSucc == 1) {
-        // fall through or uncondition branch
-        // insert increment instruction at the end of this block
+      // if (NumSucc == 1) {
+      //   // fall through or uncondition branch
+      //   // insert increment instruction at the end of this block
+      //   std::string EdgeName = F.getName().str() + std::string("_BB_") +
+      //                          std::to_string(BBNum) + std::string("_E_") +
+      //                          std::to_string(0);
+
+      //   /* End of the basic block */
+      //   Builder.SetInsertPoint(BB.getTerminator());
+
+      //   GlobalVariable *Var = CreateGlobalCounter(m, EdgeName);
+      //   EdgeCounterMap[StringRef(EdgeName)] = Var;
+
+      //   LoadInst *Load = Builder.CreateLoad(Var, "ld.edge.count");
+      //   Value *Inc = Builder.CreateAdd(Builder.getInt32(1), Load);
+      //   Builder.CreateStore(Inc, Var);
+      //   ++numEdges;
+
+      // std::cerr << "---Add Edge: " << EdgeName << std::endl;
+      // } else if (NumSucc >= 2) {
+      // if-else, conditional, or switch instrction
+      // insert instruction at the top of successor block
+      // THIS IS THE KEY: Split the edge if it's critical.
+      // SplitCriticalEdge will return the new basic block if it split,
+      // or nullptr if no split was needed. The counter goes in this new block.
+      for (unsigned i = 0, e = Terminator->getNumSuccessors(); i != e; ++i) {
+
+        BasicBlock *NewBB = SplitCriticalEdge(&BB, Terminator->getSuccessor(i));
+
+        if (NewBB) {
+          // If the edge was split, the new block is the perfect place
+          // for the counter.
+          Builder.SetInsertPoint(NewBB->getTerminator());
+        } else {
+          // If the edge was not critical, place the counter at the
+          // beginning of the successor block.
+          BasicBlock *Succ = Terminator->getSuccessor(i);
+          Builder.SetInsertPoint(Succ->getFirstNonPHI());
+        }
+
+        // --- Your existing instrumentation code ---
+        // unsigned EdgeIndex = 0;
+        // for (auto succ = succ_begin(&BB); succ != succ_end(&BB); ++succ) {
+
         std::string EdgeName = F.getName().str() + std::string("_BB_") +
                                std::to_string(BBNum) + std::string("_E_") +
-                               std::to_string(0);
-
-        /* End of the basic block */
-        Builder.SetInsertPoint(BB.getTerminator());
+                               std::to_string(i);
+        //   Builder.SetInsertPoint((*succ)->getFirstNonPHI());
 
         GlobalVariable *Var = CreateGlobalCounter(m, EdgeName);
         EdgeCounterMap[StringRef(EdgeName)] = Var;
 
         LoadInst *Load = Builder.CreateLoad(Var, "ld.edge.count");
         Value *Inc = Builder.CreateAdd(Builder.getInt32(1), Load);
+
         Builder.CreateStore(Inc, Var);
+        // ++EdgeIndex;
         ++numEdges;
-
-        // std::cerr << "---Add Edge: " << EdgeName << std::endl;
-      } else if (NumSucc >= 2) {
-        // if-else, conditional, or switch instrction
-        // insert instruction at the top of successor block
-        unsigned EdgeIndex = 0;
-        for (auto succ = succ_begin(&BB); succ != succ_end(&BB); ++succ) {
-
-          std::string EdgeName = F.getName().str() + std::string("_BB_") +
-                                 std::to_string(BBNum) + std::string("_E_") +
-                                 std::to_string(EdgeIndex);
-          Builder.SetInsertPoint((*succ)->getFirstNonPHI());
-
-          GlobalVariable *Var = CreateGlobalCounter(m, EdgeName);
-          EdgeCounterMap[StringRef(EdgeName)] = Var;
-
-          LoadInst *Load = Builder.CreateLoad(Var, "ld.edge.count");
-          Value *Inc = Builder.CreateAdd(Builder.getInt32(1), Load);
-
-          Builder.CreateStore(Inc, Var);
-          ++EdgeIndex;
-          ++numEdges;
-          // std::cerr << "Add Edge: " << EdgeName << std::endl;
-        }
-      } else {
-        //  Not handled in this scope
-        std::cerr << "Case not handled" << std::endl;
+        // std::cerr << "Add Edge: " << EdgeName << std::endl;
       }
+      // } else {
+      //   //  Not handled in this scope
+      //   std::cerr << "Case not handled" << std::endl;
+      // }
 
       ++BBNum;
     }
