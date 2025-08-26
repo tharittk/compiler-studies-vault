@@ -3,6 +3,7 @@
 #include "Profile/EdgeProfileLoader.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/CFG.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
 #include <fstream>
@@ -105,12 +106,16 @@ double EdgeProfileLoader::getWeight(const Edge &edge) const {
   // get the count of over block that leaves this
   unsigned Sum = 0;
   const BasicBlock *src = edge.first;
-  unsigned EdgeIndex = 0;
-  for (auto succ = succ_begin(src); succ != succ_end(src); ++succ) {
-    std::string Name = PrefixEdgeName + std::to_string(EdgeIndex);
-    ++EdgeIndex;
+
+  auto *Terminator = src->getTerminator();
+  for (unsigned i = 0, e = Terminator->getNumSuccessors(); i != e; ++i) {
+    // unsigned EdgeIndex = 0;
+    // for (auto succ = succ_begin(src); succ != succ_end(src); ++succ) {
+    std::string Name = PrefixEdgeName + std::to_string(i);
+    Sum += static_cast<double>(EdgeNameToCount.lookup(Name));
+    //   ++EdgeIndex;
   }
-  if (Sum == 0)
-    return 0.0;
+  // if (Sum == 0)
+  //   return 0.0;
   return static_cast<double>(EdgeNameToCount.lookup(EdgeName)) / Sum;
 }

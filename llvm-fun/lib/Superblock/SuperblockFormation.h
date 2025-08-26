@@ -30,7 +30,9 @@ public:
   }
 
 private:
-  // TODO Add any functions or variables you want
+  BasicBlock *selectTrace(Module &m);
+  BasicBlock *getBestPredecessorOf(BasicBlock *BB);
+  BasicBlock *getBestPredecessorOf(BasicBlock *BB);
 };
 
 } // namespace fun
