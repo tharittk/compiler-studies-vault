@@ -66,7 +66,7 @@ bool BBProfileLoader::runOnModule(Module &m) {
     BBNameToCount[BBName] = count;
   }
   InFile.close();
-  numBBs = BBNameToCount["TotalBlocks"];
+  numBBs = BBNameToCount["ALL"];
 
   return false;
 }

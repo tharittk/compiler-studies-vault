@@ -36,6 +36,7 @@ bool BBProfiler::runOnModule(Module &m) {
       // Create global counter for each basic block
       // This must be a constant address because we basically
       // encode that address info for code generation
+      // TODO: Use nmae from instnamer pass !!! (required then)
       std::string BBName =
           F.getName().str() + std::string("_BB_") + std::to_string(BBNum);
 
@@ -52,103 +53,7 @@ bool BBProfiler::runOnModule(Module &m) {
     }
   }
 
-  // STEP 2: Write result to file
-  //   PointerType *PrintfArgTy = PointerType::getUnqual(Type::getInt8Ty(ctxt));
-  //   FunctionType *PrintfTy = FunctionType::get(IntegerType::getInt32Ty(ctxt),
-  //                                              PrintfArgTy,
-  //                                              /*IsVarArgs=*/true);
-  //   Function *Printf =
-  //       dyn_cast<Function>(m.getOrInsertFunction("printf", PrintfTy));
+  InsertWriteResultIR(m, ctxt, outputFileName, numBBs, BBCounterMap);
 
-  // STEP 3: Inject global variable that will hold printf's format string
-  //   Constant *ResultFormatStr =
-  //       ConstantDataArray::getString(ctxt, "%-20s %-10lu\n");
-  //   Constant *ResultFormatStrVar =
-  //       m.getOrInsertGlobal("ResultFormatStrIR", ResultFormatStr->getType());
-
-  //   dyn_cast<GlobalVariable>(ResultFormatStrVar)->setInitializer(ResultFormatStr);
-  //   std::string out = "";
-  //   out += "=================================================\n";
-  //   out += "NAME                 #N CALLS\n";
-  //   out += "-------------------------------------------------\n";
-
-  //   Constant *ResultHeaderStr = ConstantDataArray::getString(ctxt,
-  //   out.c_str()); Constant *ResultHeaderStrVar =
-  //       m.getOrInsertGlobal("ResultHeaderStrIR", ResultHeaderStr->getType());
-  //   dyn_cast<GlobalVariable>(ResultHeaderStrVar)->setInitializer(ResultHeaderStr);
-
-  // STEP 4: Printf wrapper that will print the result
-  FunctionType *PrintfWrapperTy =
-      FunctionType::get(Type::getVoidTy(ctxt), {}, false);
-  Function *PrintfWrapperF = dyn_cast<Function>(
-      m.getOrInsertFunction("printf_wrapper", PrintfWrapperTy));
-
-  if (PrintfWrapperF == nullptr)
-    std::cerr << "PrintfWrapperF is NULL !";
-  // Basic block for calling actual printf
-  BasicBlock *RetBlock = BasicBlock::Create(ctxt, "enter", PrintfWrapperF);
-  Builder.SetInsertPoint(RetBlock);
-  //   Value *ResultHeaderStrPtr =
-  //       Builder.CreatePointerCast(ResultHeaderStrVar, PrintfArgTy);
-  //   Value *ResultFormatStrPtr =
-  //       Builder.CreatePointerCast(ResultFormatStrVar, PrintfArgTy);
-
-  //   Builder.CreateCall(Printf, {ResultHeaderStrPtr});
-
-  //   for (auto &item : BBCounterMap) {
-  //     LoadInst *LoadCounter =
-  //         Builder.CreateLoad(item.getValue(), "ld_counter_print");
-  //     Builder.CreateCall(
-  //         Printf, ArrayRef<Value *>({ResultFormatStrPtr,
-  //                                    Builder.CreateGlobalStringPtr(item.getKey()),
-  //                                    LoadCounter}));
-  //   }
-
-  // STEP 4.1: Write output to a file
-  FunctionType *FopenType = FunctionType::get(
-      Type::getInt8PtrTy(ctxt),
-      ArrayRef<Type *>({Type::getInt8PtrTy(ctxt), Type::getInt8PtrTy(ctxt)}),
-      false);
-  FunctionType *FprintfType =
-      FunctionType::get(Type::getInt32Ty(ctxt), Type::getInt8PtrTy(ctxt), true);
-  FunctionType *FcloseType = FunctionType::get(Type::getInt32Ty(ctxt),
-                                               Type::getInt8PtrTy(ctxt), false);
-
-  Function *Fopen =
-      dyn_cast<Function>(m.getOrInsertFunction("fopen", FopenType));
-  Function *Ffprintf =
-      dyn_cast<Function>(m.getOrInsertFunction("fprintf", FprintfType));
-  Function *Fclose =
-      dyn_cast<Function>(m.getOrInsertFunction("fclose", FcloseType));
-
-  Value *Filename = Builder.CreateGlobalStringPtr(StringRef(outputFileName),
-                                                  "outfilename_str");
-  Value *Mode = Builder.CreateGlobalStringPtr(StringRef("w"), "mode_str");
-  Value *FileHandle =
-      Builder.CreateCall(Fopen, ArrayRef<Value *>({Filename, Mode}));
-
-  Value *FormatHeaderStr = Builder.CreateGlobalStringPtr(
-      StringRef("TotalBlocks:%d\n"), "format_str");
-  Value *NumBBsVal = ConstantInt::get(Type::getInt32Ty(ctxt), numBBs);
-  Builder.CreateCall(
-      Ffprintf, ArrayRef<Value *>({FileHandle, FormatHeaderStr, NumBBsVal}));
-
-  Value *FormatStr =
-      Builder.CreateGlobalStringPtr(StringRef("%s:%d\n"), "format_str");
-
-  for (auto &item : BBCounterMap) {
-    LoadInst *LoadCounter =
-        Builder.CreateLoad(item.getValue(), "ld_counter_printB");
-
-    Builder.CreateCall(
-        Ffprintf,
-        ArrayRef<Value *>({FileHandle, FormatStr,
-                           Builder.CreateGlobalStringPtr(item.getKey()),
-                           LoadCounter}));
-  }
-
-  Builder.CreateCall(Fclose, FileHandle);
-  Builder.CreateRetVoid();
-  appendToGlobalDtors(m, PrintfWrapperF, /*Priority=*/0);
   return true;
 }

@@ -102,7 +102,7 @@ void ProfilePrinter::dumpEdgeInfo(const Module &m, std::ofstream &fout) {
       for (auto &kv : name2PredMap) {
         const BasicBlock *succ = kv.second;
         EdgeProfileLoader::Edge edge = EdgeProfileLoader::getEdge(bb, succ);
-        std::cout << "Get name succ " << succ->getName().str() << "\n";
+        // std::cout << "Get name succ " << succ->getName().str() << "\n";
         fout << bb->getName().str() << " -> " << succ->getName().str() << ": "
              << loader.getCount(edge) << " (" << loader.getWeight(edge) * 100
              << "%)\n";

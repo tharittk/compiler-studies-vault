@@ -79,7 +79,7 @@ bool EdgeProfileLoader::runOnModule(Module &m) {
     }
   }
   InFile.close();
-  numEdges = EdgeNameToCount["TotalEdges"];
+  numEdges = EdgeNameToCount["ALL"];
 
   return false;
 }
@@ -98,11 +98,12 @@ double EdgeProfileLoader::getWeight(const Edge &edge) const {
 
   size_t pos = EdgeName.find("_E_");
 
-  std::cout << "Look up name:" << EdgeName
-            << " get: " << static_cast<double>(EdgeNameToCount.lookup(EdgeName))
-            << "\n";
+  // std::cout << "Look up name:" << EdgeName
+  //           << " get: " <<
+  //           static_cast<double>(EdgeNameToCount.lookup(EdgeName))
+  //           << "\n";
   std::string PrefixEdgeName = EdgeName.substr(0, pos + 3);
-  std::cout << "Prefix name: " << PrefixEdgeName << "\n";
+  // std::cout << "Prefix name: " << PrefixEdgeName << "\n";
   // get the count of over block that leaves this
   unsigned Sum = 0;
   const BasicBlock *src = edge.first;

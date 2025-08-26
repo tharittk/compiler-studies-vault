@@ -2,7 +2,7 @@
 
 echo "*** Test BB and Edges Profiler ***"
 
-rm prof_dump.txt
+rm prof_dump.txt edge_info.prof bb_info.prof ./tests/namer.ll ./tests/prof.ll
 opt -break-crit-edges -mem2reg -instnamer -S -o ./tests/namer.ll ./tests/superblock.ll
 opt -load Debug+Asserts/lib/Profile.so -bb-profiler -edge-profiler -S -o ./tests/prof.ll ./tests/namer.ll
 # interpret to get the text output
