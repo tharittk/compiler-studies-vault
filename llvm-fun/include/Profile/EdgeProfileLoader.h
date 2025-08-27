@@ -17,7 +17,6 @@ public:
   typedef std::pair<const BasicBlock *, const BasicBlock *> Edge;
 
   // Creates an Edge between two BasicBlocks.
-  DenseMap<uint64_t, std::string> EdgeToEdgeName;
   StringMap<unsigned> EdgeNameToCount;
 
   static Edge getEdge(const BasicBlock *src, const BasicBlock *dest) {

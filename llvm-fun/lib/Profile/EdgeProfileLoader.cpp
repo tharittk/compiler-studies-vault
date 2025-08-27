@@ -39,24 +39,6 @@ uint64_t hashEdge(const BasicBlock &src, const BasicBlock &dest) {
 
 bool EdgeProfileLoader::runOnModule(Module &m) {
 
-  // STEP 1: Build Hash table for input from table
-  for (auto &F : m) {
-    unsigned BBNum = 0;
-    for (auto &BB : F) {
-      unsigned EdgeIndex = 0;
-      for (auto succ = succ_begin(&BB); succ != succ_end(&BB); ++succ) {
-        std::string EdgeName = F.getName().str() + std::string("_BB_") +
-                               std::to_string(BBNum) + std::string("_E_") +
-                               std::to_string(EdgeIndex);
-
-        EdgeToEdgeName.insert(std::pair<uint64_t, std::string>(
-            {hashEdge(BB, *(*succ)), EdgeName}));
-        ++EdgeIndex;
-      }
-      ++BBNum;
-    }
-  }
-  // STEP 2: Read file and map BB Name -> counts
   std::ifstream InFile(profileFileName);
   if (!InFile.is_open()) {
     std::cerr << "Error opening file" << std::endl;
@@ -73,10 +55,8 @@ bool EdgeProfileLoader::runOnModule(Module &m) {
       parts.push_back(part);
     }
     std::string EdgeName = parts[0];
-    if (parts.size() == 2) {
-      unsigned count = std::stoi(parts[1]);
-      EdgeNameToCount[EdgeName] = count;
-    }
+    unsigned count = std::stoi(parts[1]);
+    EdgeNameToCount[EdgeName] = count;
   }
   InFile.close();
   numEdges = EdgeNameToCount["ALL"];
@@ -86,37 +66,19 @@ bool EdgeProfileLoader::runOnModule(Module &m) {
 
 unsigned EdgeProfileLoader::getCount(const Edge &edge) const {
   std::string EdgeName =
-      EdgeToEdgeName.lookup(hashEdge(*edge.first, *edge.second));
-
+      (*edge.first).getName().str() + (*edge.second).getName().str();
   return EdgeNameToCount.lookup(EdgeName);
 }
 
 double EdgeProfileLoader::getWeight(const Edge &edge) const {
-
-  std::string EdgeName =
-      EdgeToEdgeName.lookup(hashEdge(*edge.first, *edge.second));
-
-  size_t pos = EdgeName.find("_E_");
-
-  // std::cout << "Look up name:" << EdgeName
-  //           << " get: " <<
-  //           static_cast<double>(EdgeNameToCount.lookup(EdgeName))
-  //           << "\n";
-  std::string PrefixEdgeName = EdgeName.substr(0, pos + 3);
-  // std::cout << "Prefix name: " << PrefixEdgeName << "\n";
-  // get the count of over block that leaves this
-  unsigned Sum = 0;
   const BasicBlock *src = edge.first;
-
+  std::string EdgeName = src->getName().str() + (*edge.second).getName().str();
   auto *Terminator = src->getTerminator();
+  unsigned Sum = 0;
   for (unsigned i = 0, e = Terminator->getNumSuccessors(); i != e; ++i) {
-    // unsigned EdgeIndex = 0;
-    // for (auto succ = succ_begin(src); succ != succ_end(src); ++succ) {
-    std::string Name = PrefixEdgeName + std::to_string(i);
-    Sum += static_cast<double>(EdgeNameToCount.lookup(Name));
-    //   ++EdgeIndex;
+    std::string EName =
+        src->getName().str() + Terminator->getSuccessor(i)->getName().str();
+    Sum += static_cast<double>(EdgeNameToCount.lookup(EName));
   }
-  // if (Sum == 0)
-  //   return 0.0;
   return static_cast<double>(EdgeNameToCount.lookup(EdgeName)) / Sum;
 }

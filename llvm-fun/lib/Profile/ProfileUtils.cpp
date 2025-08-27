@@ -24,6 +24,7 @@ void InsertWriteResultIR(Module &m, LLVMContext &ctxt,
 
   FunctionType *PrintfWrapperTy =
       FunctionType::get(Type::getVoidTy(ctxt), {}, false);
+  // this needs a unique name otherwise only first definition is called
   Function *PrintfWrapperF = dyn_cast<Function>(m.getOrInsertFunction(
       "printf_wrapper_" + outputFileName, PrintfWrapperTy));
 

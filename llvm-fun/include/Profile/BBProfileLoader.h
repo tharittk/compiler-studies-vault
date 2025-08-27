@@ -14,7 +14,6 @@ class BBProfileLoader : public ModulePass {
 public:
   static char ID; // Pass identification, replacement for typeid
 
-  DenseMap<uint64_t, std::string> BBToBBName;
   StringMap<unsigned> BBNameToCount;
 
   BBProfileLoader() : ModulePass(ID) {}
@@ -27,8 +26,6 @@ public:
   void getAnalysisUsage(AnalysisUsage &au) const override {
     au.setPreservesAll();
   }
-
-  // TODO Impelement this function
 
   // This should return the execution count for the given basic block
   unsigned getCount(const BasicBlock *bb) const;

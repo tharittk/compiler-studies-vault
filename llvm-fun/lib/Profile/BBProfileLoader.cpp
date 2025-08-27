@@ -35,17 +35,6 @@ uint64_t hashBB(const BasicBlock &BB) {
 }
 
 bool BBProfileLoader::runOnModule(Module &m) {
-  // STEP 1: Hash BasicBlock* to name
-  for (auto &F : m) {
-    int BBNum = 0;
-    for (const auto &BB : F) {
-      std::string BBName = F.getName().str() + "_BB_" + std::to_string(BBNum);
-      BBToBBName.insert(std::pair<uint64_t, std::string>({hashBB(BB), BBName}));
-      ++BBNum;
-    }
-  }
-
-  // STEP 2: Read file and map BB Name -> counts
   std::ifstream InFile(profileFileName);
   if (!InFile.is_open()) {
     std::cerr << "Error opening file" << std::endl;
@@ -72,7 +61,5 @@ bool BBProfileLoader::runOnModule(Module &m) {
 }
 
 unsigned BBProfileLoader::getCount(const BasicBlock *bb) const {
-  std::string BBName = BBToBBName.lookup(hashBB(*bb));
-  // unsigned count = BBNameToCount.lookup(BBName);
-  return BBNameToCount.lookup(BBName);
+  return BBNameToCount.lookup(bb->getName().str());
 }

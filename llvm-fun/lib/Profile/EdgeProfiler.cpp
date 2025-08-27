@@ -29,7 +29,6 @@ static cl::opt<std::string> outputFileName(
 bool EdgeProfiler::runOnModule(Module &m) {
   auto &ctxt = m.getContext();
 
-  // STEP 1:
   IRBuilder<> Builder(ctxt);
   for (auto &F : m) {
     unsigned BBNum = 0;
@@ -51,10 +50,8 @@ bool EdgeProfiler::runOnModule(Module &m) {
           Builder.SetInsertPoint(Succ->getFirstNonPHI());
         }
 
-        std::string EdgeName = F.getName().str() + std::string("_BB_") +
-                               std::to_string(BBNum) + std::string("_E_") +
-                               std::to_string(i);
-        //   Builder.SetInsertPoint((*succ)->getFirstNonPHI());
+        std::string EdgeName =
+            BB.getName().str() + Terminator->getSuccessor(i)->getName().str();
         GlobalVariable *Var = CreateGlobalCounter(m, EdgeName);
         EdgeCounterMap[StringRef(EdgeName)] = Var;
 
@@ -62,13 +59,12 @@ bool EdgeProfiler::runOnModule(Module &m) {
         Value *Inc = Builder.CreateAdd(Builder.getInt32(1), Load);
 
         Builder.CreateStore(Inc, Var);
-        // ++EdgeIndex;
         ++numEdges;
       }
-
       ++BBNum;
     }
   }
+
   InsertWriteResultIR(m, ctxt, outputFileName, numEdges, EdgeCounterMap);
 
   return true;

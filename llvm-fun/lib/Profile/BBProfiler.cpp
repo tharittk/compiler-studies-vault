@@ -29,27 +29,16 @@ bool BBProfiler::runOnModule(Module &m) {
   auto &ctxt = m.getContext();
 
   IRBuilder<> Builder(ctxt);
-  // STEP 1: Code Injection
   for (auto &F : m) {
-    unsigned BBNum = 0; // BB numbering
     for (auto &BB : F) {
-      // Create global counter for each basic block
-      // This must be a constant address because we basically
-      // encode that address info for code generation
-      // TODO: Use nmae from instnamer pass !!! (required then)
-      std::string BBName =
-          F.getName().str() + std::string("_BB_") + std::to_string(BBNum);
-
-      GlobalVariable *Var = CreateGlobalCounter(m, BBName);
-      BBCounterMap[StringRef(BBName)] = Var;
-
+      GlobalVariable *Var = CreateGlobalCounter(m, BB.getName());
+      BBCounterMap[StringRef(BB.getName())] = Var;
       Builder.SetInsertPoint(BB.getFirstNonPHI());
       // Load, inc, store
       LoadInst *Load = Builder.CreateLoad(Var, "ld.block.count");
       Value *Inc = Builder.CreateAdd(Builder.getInt32(1), Load);
       Builder.CreateStore(Inc, Var);
       ++numBBs;
-      ++BBNum;
     }
   }
 
