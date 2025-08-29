@@ -3,6 +3,7 @@
 
 #include "Profile/BBProfileLoader.h"
 #include "Profile/EdgeProfileLoader.h"
+#include "llvm/ADT/PriorityQueue.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
@@ -30,8 +31,10 @@ public:
   }
 
 private:
-  BasicBlock *selectTrace(Module &m);
-  BasicBlock *getBestPredecessorOf(BasicBlock *BB);
+  template <typename T>
+  std::vector<std::deque<BasicBlock *>> selectTraceInnerMostLoop(
+      Module &m, PriorityQueue<BasicBlock *, std::vector<BasicBlock *>, T> &pq);
+  BasicBlock *getBestSuccessorOf(BasicBlock *BB);
   BasicBlock *getBestPredecessorOf(BasicBlock *BB);
 };
 
