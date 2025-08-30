@@ -18,7 +18,7 @@ public:
 
   EdgeProfiler() : ModulePass(ID) {}
 
-  bool runOnModule(Module &m);
+  bool runOnModule(Module &m) override;
 
   virtual const char *getPassName() const override { return "Edge Profiler"; }
 

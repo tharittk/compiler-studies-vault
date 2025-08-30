@@ -15,7 +15,6 @@
 using namespace llvm;
 using namespace fun;
 
-// TODO Set this number to the right value
 STATISTIC(numEdges, "The # of edges profiled.");
 
 char EdgeProfiler::ID = 0;
@@ -31,7 +30,6 @@ bool EdgeProfiler::runOnModule(Module &m) {
 
   IRBuilder<> Builder(ctxt);
   for (auto &F : m) {
-    unsigned BBNum = 0;
     for (auto &BB : F) {
       TerminatorInst *Terminator = BB.getTerminator();
 
@@ -61,7 +59,6 @@ bool EdgeProfiler::runOnModule(Module &m) {
         Builder.CreateStore(Inc, Var);
         ++numEdges;
       }
-      ++BBNum;
     }
   }
 

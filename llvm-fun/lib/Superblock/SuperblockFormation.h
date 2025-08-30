@@ -8,6 +8,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
+
+#include <unordered_set>
 namespace fun {
 
 using namespace llvm;
@@ -33,11 +35,12 @@ public:
 private:
   template <typename T>
   std::vector<std::deque<BasicBlock *>> selectTraceInnerMostLoop(
-      Module &m, PriorityQueue<BasicBlock *, std::vector<BasicBlock *>, T> &pq);
-  BasicBlock *getBestSuccessorOf(BasicBlock *BB);
-  BasicBlock *getBestPredecessorOf(BasicBlock *BB);
+      Module &m, Loop *InnerLoop,
+      PriorityQueue<BasicBlock *, std::vector<BasicBlock *>, T> &pq);
+  BasicBlock *getBestSuccessorOf(BasicBlock *BB, Loop *InnerLoop,
+                                 std::unordered_set<BasicBlock *> &Visited);
+  BasicBlock *getBestPredecessorOf(BasicBlock *BB, Loop *InnerLoop,
+                                   std::unordered_set<BasicBlock *> &Visited);
 };
-
 } // namespace fun
-
 #endif
