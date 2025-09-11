@@ -230,55 +230,60 @@ bool SuperblockFormation::runOnModule(Module &m) {
      * the hottest*/
     auto Traces = selectTraceInnerMostLoop(m, L, PQ);
     /* Tail duplication */
-    if (Traces.empty()) continue;
+    if (Traces.empty())
+      continue;
 
     std::deque<BasicBlock *> &HotTrace = Traces[0];
-    if (HotTrace.empty()) continue;
+    if (HotTrace.empty())
+      continue;
 
-    std::unordered_set<BasicBlock *> TraceBlocks(HotTrace.begin(), HotTrace.end());
+    std::unordered_set<BasicBlock *> TraceBlocks(HotTrace.begin(),
+                                                 HotTrace.end());
     std::vector<std::pair<BasicBlock *, BasicBlock *>> SideEntrances;
 
     int TailStartIdx = -1;
 
     for (int i = 0; i < HotTrace.size(); ++i) {
-        BasicBlock *BB = HotTrace[i];
-        for (pred_iterator PI = pred_begin(BB); PI != pred_end(BB); ++PI) {
-            BasicBlock *Pred = *PI;
-            if (TraceBlocks.find(Pred) == TraceBlocks.end()) {
-                SideEntrances.push_back({Pred, BB});
-                if (TailStartIdx == -1) {
-                    TailStartIdx = i;
-                }
-            }
+      BasicBlock *BB = HotTrace[i];
+      for (pred_iterator PI = pred_begin(BB); PI != pred_end(BB); ++PI) {
+        BasicBlock *Pred = *PI;
+        if (TraceBlocks.find(Pred) == TraceBlocks.end()) {
+          SideEntrances.push_back({Pred, BB});
+          if (TailStartIdx == -1) {
+            TailStartIdx = i;
+          }
         }
+      }
     }
 
     if (TailStartIdx != -1) {
-        ValueToValueMapTy VMap;
-        const Twine NameSuffix = ".cloned";
+      ValueToValueMapTy VMap;
+      const Twine NameSuffix = ".cloned";
 
-        std::vector<BasicBlock *> Tail;
-        for (int i = TailStartIdx; i < HotTrace.size(); ++i) {
-            Tail.push_back(HotTrace[i]);
-        }
+      std::vector<BasicBlock *> Tail;
+      for (int i = TailStartIdx; i < HotTrace.size(); ++i) {
+        Tail.push_back(HotTrace[i]);
+      }
 
-        for (BasicBlock *BB : Tail) {
-            BasicBlock *ClonedBB = CloneBasicBlock(BB, VMap, NameSuffix, BB->getParent());
-            VMap[BB] = ClonedBB;
-            numClonedBBs++;
-        }
+      for (BasicBlock *BB : Tail) {
+        BasicBlock *ClonedBB =
+            CloneBasicBlock(BB, VMap, NameSuffix, BB->getParent());
+        VMap[BB] = ClonedBB;
+        numClonedBBs++;
+      }
 
-        for (BasicBlock* BB : Tail) {
-            BasicBlock* ClonedBB = cast<BasicBlock>(VMap[BB]);
-            for (Instruction &I : *ClonedBB) {
-                RemapInstruction(&I, VMap, RF_NoModuleLevelChanges | RF_IgnoreMissingLocals);
-            }
+      for (BasicBlock *BB : Tail) {
+        BasicBlock *ClonedBB = cast<BasicBlock>(VMap[BB]);
+        for (Instruction &I : *ClonedBB) {
+          RemapInstruction(&I, VMap,
+                           RF_NoModuleLevelChanges | RF_IgnoreMissingEntries);
         }
+      }
 
-        for (auto const& [Pred, BB] : SideEntrances) {
-            BasicBlock* ClonedBB = cast<BasicBlock>(VMap[BB]);
-            changeSuccessor(Pred, BB, ClonedBB);
-        }
+      for (auto const &[Pred, BB] : SideEntrances) {
+        BasicBlock *ClonedBB = cast<BasicBlock>(VMap[BB]);
+        changeSuccessor(Pred, BB, ClonedBB);
+      }
     }
   }
 
