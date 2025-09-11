@@ -5,9 +5,13 @@
 #include "Profile/EdgeProfileLoader.h"
 #include "llvm/ADT/PriorityQueue.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #include <unordered_set>
 namespace fun {

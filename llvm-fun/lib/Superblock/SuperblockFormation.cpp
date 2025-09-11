@@ -20,7 +20,6 @@ M                    M
 
 */
 
-// TODO Set this number to the right value
 STATISTIC(numClonedBBs, "The # of cloned basic blocks");
 
 char SuperblockFormation::ID = 0;
@@ -52,6 +51,10 @@ BasicBlock *SuperblockFormation::getBestSuccessorOf(
     }
   }
 
+  // check if this is a backedge
+  if (InnerLoop->getHeader() == Dest)
+    return nullptr;
+
   if (MaxWeight < biasThreshold)
     return nullptr;
   // Check if dest is outside the loop
@@ -66,7 +69,9 @@ BasicBlock *SuperblockFormation::getBestSuccessorOf(
 BasicBlock *SuperblockFormation::getBestPredecessorOf(
     BasicBlock *BB, Loop *InnerLoop,
     std::unordered_set<BasicBlock *> &Visited) {
-  // TODO: check if BB is a loop header
+
+  if (InnerLoop->getHeader() == BB)
+    return nullptr;
 
   // get edge with the hightest probability entering BB
   EdgeProfileLoader &EdgeProfiler = getAnalysis<EdgeProfileLoader>();
@@ -163,6 +168,33 @@ void findInnermostLoops(Loop *L, std::vector<Loop *> &InnerLoops) {
   }
 }
 
+int getPredCount(BasicBlock *BB) {
+  int count = 0;
+  for (pred_iterator PI = pred_begin(BB); PI != pred_end(BB); ++PI) {
+    ++count;
+  }
+  return count;
+}
+
+void changeSuccessor(BasicBlock *Src, BasicBlock *OldDest,
+                     BasicBlock *NewDest) {
+
+  Instruction *TermInst = Src->getTerminator();
+  if (BranchInst *BrInst = dyn_cast<BranchInst>(TermInst); BrInst != nullptr) {
+    if (BrInst->isUnconditional()) {
+      BrInst->setSuccessor(0, NewDest);
+    } else {
+      if (BrInst->getSuccessor(0) == OldDest) {
+        BrInst->setSuccessor(0, NewDest);
+      } else if (BrInst->getSuccessor(1) == OldDest) {
+        BrInst->setSuccessor(1, NewDest);
+      } else {
+        llvm_unreachable("change successor: old successor does not match");
+      }
+    }
+  }
+}
+
 bool SuperblockFormation::runOnModule(Module &m) {
   // You can also add other functions or variables to this class or this file
   BBProfileLoader &BBProfiler = getAnalysis<BBProfileLoader>();
@@ -175,7 +207,7 @@ bool SuperblockFormation::runOnModule(Module &m) {
            BBProfiler.BBNameToCount[BB2->getName()];
   };
 
-  // Work on Inner loop only
+  /* Find the inner loop recursively */
   std::vector<Loop *> InnerLoops;
   for (LoopInfo::iterator LIt = LI.begin(); LIt != LI.end(); ++LIt) {
     Loop *L = *LIt;
@@ -194,22 +226,37 @@ bool SuperblockFormation::runOnModule(Module &m) {
       PQ.push(*BI);
     }
 
+    /* Pick the traces from the inner loop - first trace in a vector Traces is
+     * the hottest*/
     auto Traces = selectTraceInnerMostLoop(m, L, PQ);
+    /* Tail duplication */
+
+    /* iterate over that trace until hit the BB that has side-entrace */
+    std::deque<BasicBlock *> HotTrace = Traces[0];
+
+    bool beginClone = false;
+
+    ValueToValueMapTy VMap; // A map to track cloned values
+    const Twine NameSuffix = ".cloned";
+    BasicBlock *PrevBB, *ClonedBB;
+    for (auto it = HotTrace.begin(); it != HotTrace.end(); ++it) {
+
+      BasicBlock *CurrBB = *it;
+      /* side entrace first detected, must cloen til the end of trace*/
+      if (!beginClone && getPredCount(CurrBB) > 1) {
+        beginClone = true;
+      }
+      if (beginClone) {
+        ClonedBB =
+            CloneBasicBlock(CurrBB, VMap, NameSuffix, CurrBB->getParent());
+        changeSuccessor(PrevBB, CurrBB, ClonedBB);
+      }
+      PrevBB = CurrBB;
+    }
+
+    /* connect the end of the chain (tail') to the merge point */
+    BranchInst::Create(PrevBB->getTerminator()->getSuccessor(0), ClonedBB);
   }
-
-  /* Find the inner loop */
-
-  /* Pick the trace from the inner loop */
-
-  /* iterate over that trace until hit the BB that has side-entrace */
-
-  /* make a 'chain' of clone after that (nothing conntect on the side) */
-
-  /* connect this chain to the original joint */
-
-  /* connect the end of the chain (tail') to the merge point */
-
-  /* At the header of the side-entrance, remove the edge from trace */
 
   return true;
 }
