@@ -147,7 +147,7 @@ SuperblockFormation::selectTraceInnerMostLoop(
       BasicBlock *Prev = getBestPredecessorOf(Current, InnerLoop, Visited);
       if (!Prev)
         break;
-      Traces[i].push_back(Prev);
+      Traces[i].push_front(Prev);
       Visited.insert(Prev);
       Current = Prev;
     }
@@ -230,32 +230,61 @@ bool SuperblockFormation::runOnModule(Module &m) {
      * the hottest*/
     auto Traces = selectTraceInnerMostLoop(m, L, PQ);
     /* Tail duplication */
+    if (Traces.empty())
+      continue;
 
-    /* iterate over that trace until hit the BB that has side-entrace */
-    std::deque<BasicBlock *> HotTrace = Traces[0];
+    std::deque<BasicBlock *> &HotTrace = Traces[0];
+    if (HotTrace.empty())
+      continue;
 
-    bool beginClone = false;
+    std::unordered_set<BasicBlock *> TraceBlocks(HotTrace.begin(),
+                                                 HotTrace.end());
+    std::vector<std::pair<BasicBlock *, BasicBlock *>> SideEntrances;
 
-    ValueToValueMapTy VMap; // A map to track cloned values
-    const Twine NameSuffix = ".cloned";
-    BasicBlock *PrevBB, *ClonedBB;
-    for (auto it = HotTrace.begin(); it != HotTrace.end(); ++it) {
+    int TailStartIdx = -1;
 
-      BasicBlock *CurrBB = *it;
-      /* side entrace first detected, must cloen til the end of trace*/
-      if (!beginClone && getPredCount(CurrBB) > 1) {
-        beginClone = true;
+    for (int i = 0; i < HotTrace.size(); ++i) {
+      BasicBlock *BB = HotTrace[i];
+      for (pred_iterator PI = pred_begin(BB); PI != pred_end(BB); ++PI) {
+        BasicBlock *Pred = *PI;
+        if (TraceBlocks.find(Pred) == TraceBlocks.end()) {
+          SideEntrances.push_back({Pred, BB});
+          if (TailStartIdx == -1) {
+            TailStartIdx = i;
+          }
+        }
       }
-      if (beginClone) {
-        ClonedBB =
-            CloneBasicBlock(CurrBB, VMap, NameSuffix, CurrBB->getParent());
-        changeSuccessor(PrevBB, CurrBB, ClonedBB);
-      }
-      PrevBB = CurrBB;
     }
 
-    /* connect the end of the chain (tail') to the merge point */
-    BranchInst::Create(PrevBB->getTerminator()->getSuccessor(0), ClonedBB);
+    if (TailStartIdx != -1) {
+      ValueToValueMapTy VMap;
+      const Twine NameSuffix = ".cloned";
+
+      std::vector<BasicBlock *> Tail;
+      for (int i = TailStartIdx; i < HotTrace.size(); ++i) {
+        Tail.push_back(HotTrace[i]);
+      }
+
+      for (BasicBlock *BB : Tail) {
+        BasicBlock *ClonedBB =
+            CloneBasicBlock(BB, VMap, NameSuffix, BB->getParent());
+        VMap[BB] = ClonedBB;
+        numClonedBBs++;
+      }
+
+      for (BasicBlock *BB : Tail) {
+        BasicBlock *ClonedBB = cast<BasicBlock>(VMap[BB]);
+        for (Instruction &I : *ClonedBB) {
+          RemapInstruction(&I, VMap,
+                           RF_NoModuleLevelChanges | RF_IgnoreMissingEntries);
+        }
+      }
+
+      for (auto const &[Pred, BB] : SideEntrances) {
+        BasicBlock *ClonedBB = cast<BasicBlock>(VMap[BB]);
+        changeSuccessor(Pred, BB, ClonedBB);
+      }
+    }
   }
 
   return true;
