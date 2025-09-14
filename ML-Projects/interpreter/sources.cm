@@ -1,8 +1,0 @@
-Group is
-	slp.sml
-	interp.sml
-	maxarg.sml
-	testprog.sml
-	test.sml
-
-	$/basis.cm
